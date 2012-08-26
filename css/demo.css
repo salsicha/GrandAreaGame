@@ -1,0 +1,228 @@
+body 
+{
+    background: #333;
+    color: #fff;
+    font: 300 100.1% "Helvetica Neue", Helvetica, "Arial Unicode MS", Arial, sans-serif;
+}
+
+#holder 
+{
+	position:relative;
+    height: 500px;
+    width: 980px;
+	margin-left: 200px;
+}
+
+p a 
+{
+	color: #666;
+}
+
+.gameboard
+{
+	position: relative;
+	border: 2px solid #ffffff;
+	margin: 0px auto;
+	width: 1185px;
+	height: 805px;
+	top: 10px;
+}
+
+.titlebar
+{
+	position:relative;
+	top: 0px;
+	left: 0px;
+    height: 100px;
+    margin: 0px auto;
+    width: 1180px;
+	border: 2px solid #ffffff;
+}
+
+.actionsbar
+{
+	position:absolute; 
+	top: 105px; 
+	text-align: left; 
+	border: 2px solid #ffffff; 
+	height: 490px;
+	width: 200px;
+}
+
+.infobar
+{
+	position:absolute; 
+	top: -50px; 
+	text-align: left; 
+	border: 2px solid #ffffff; 
+	height: 200px;
+	width: 1180px;
+	margin-top: 650px;
+}
+
+.gametitle
+{
+	position:relative; 
+	top:10px; 
+	text-align:center;
+	font-size:32px;
+}
+
+.playername
+{
+	position:relative; 
+	top:10px; 
+	text-align:center;
+}
+
+.button {
+ font-family: Helvetica ;
+ font-weight: bold ;
+ padding: 15px; 
+ border: 1px solid black ;
+ -moz-border-radius: 8px ;
+ -webkit-border-radius: 8px ; 
+/* margin-top: 10px ;
+ margin-bottom: 10px ;*/
+ background-color: white ;
+}
+
+/*.playertotalwealth
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+.playerfamilywealth
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+.playerhumandevelopment
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+.playerarmedforces
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+.playerfuelexports
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}*/
+
+.playerstats
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+.gamekey
+{
+	position:relative; 
+	top:50px; 
+	text-align:center;
+}
+
+.indicesdisplay
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+.indicesdata
+{
+	position:relative; 
+	top:20px; 
+	text-align:center;
+}
+
+/*.gameui
+{
+	position:relative;
+	top:60px;
+	text-align:center;
+}*/
+
+.foter_notes
+{
+	position:relative;
+	top:0px;
+	text-align:center;
+	top:200px;
+	
+/*	height:3400px;*/
+/*	background-color:#000033;*/
+}
+
+.about_ga
+{
+	position:relative;
+	top:200px;
+	width:800px;
+	height:1500px;
+	background-color:#59955C;
+	font-family:times;
+}
+
+.design_docs
+{
+	position:relative;
+	top:50px;
+	width:700px;
+	text-align:left;
+	color:#000033;
+}
+
+.dd_header
+{
+	text-align:center;
+	font-size:42px;
+/*	font-style:oblique;*/
+	font-weight:bold;
+}
+
+.dd_sub_header
+{
+	font-size:36px;
+}
+
+.dd_sub_sub_header
+{
+	font-size:26px;
+}
+
+.city_hover
+{
+	position: absolute;
+	display: none;
+	padding-left: 10px;
+	width: auto;
+	z-index: 2;
+	background-image: url(../img/arrow.gif);
+	background-repeat: no-repeat;
+	background-position: 0 10px;
+}
+
+.city_hover .c_label
+{
+	display: block;
+	padding: 10px;
+	color: #000;
+	background-color: #fff;
+	/* IE fix */
+	overflow: hidden;
+}

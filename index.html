@@ -1,0 +1,412 @@
+﻿
+<!-- 
+TODO
+End Turn button should switch players
+Sanction and Support buttons should be drag-n-droppable tokens with number indicator
+player and target stats
+an 'x' box net to the Target stats that indicate you support or sanction (to reclaim token)
+zoom and pan need centering
+needs to zoom when touching water (make water svg object?)
+-->
+
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-2022-JP">
+<html lang="en">
+    <head>
+		<!-- Prevent scaling -->
+		<meta name="viewport" content="user-scalable=no, width=device-width" />
+
+		<!-- Eliminate url and button bars if added to home screen -->
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+
+		<!-- Choose how to handle the phone status bar -->
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	
+		<!-- startup image -->
+		<link rel="apple-touch-startup-image" href="./img/startup.png" />
+
+		<!-- home screen thumbnail -->
+		<link rel="apple-touch-icon" href="./img/apple-touch-icon.png" />
+
+        <meta charset="utf-8">
+        <title>Grand Area: The game of global hegemony</title>
+        <link rel="stylesheet" href="css/demo.css" type="text/css" media="screen">
+        <link rel="stylesheet" href="css/demo-print.css" type="text/css" media="print">
+		<link rel="stylesheet" href="lightbox2/css/lightbox.css" type="text/css" media="screen" />
+		<link href="greybox/gb_styles.css" rel="stylesheet" type="text/css" />
+		
+		<script type="text/javascript">
+		    // var GB_ROOT_DIR = "http://grandareagame.com/greybox/";
+			var GB_ROOT_DIR = "greybox/";
+		</script>
+		
+        <script src="js/raphael.js" type="text/javascript"></script>
+        <script src="js/world.js" type="text/javascript"></script>
+		<script src="raphael-zpd/raphael-zpd-alt.js"></script>
+		<script src="js/functions.js"></script>
+		
+		<script type="text/javascript" src="js/prototype.js"></script>
+		<script type="text/javascript" src="scriptaculous/src/scriptaculous.js?load=effects,builder"></script>
+		
+		<script type="text/javascript" src="greybox/AJS.js"></script>
+		<script type="text/javascript" src="greybox/AJS_fx.js"></script>
+		<script type="text/javascript" src="greybox/gb_scripts.js"></script>
+		
+		<script type="text/javascript" src="js/data.js"></script>
+		<script type="text/javascript" src="js/simulate.js"></script>
+		
+        <script type="text/javascript">   
+
+			var index_data = new Array();
+			var total_wealth = new Array();
+			var gini_index = new Array();
+			var human_development = new Array();
+			var armed_forces = new Array();
+			var fuel_exports = new Array();
+			var family_wealth = new Array();
+			var city_name = new Array();
+			// var in_use = new Array();
+			var lat_y = new Array();
+			var lon_x = new Array();
+			var max_total_wealth = 0;
+			var max_gini_index = 0;
+			var max_family_wealth = 0;
+			var max_human_development = 0;
+			var max_armed_forces = 0;
+			var max_fuel_exports = 0;
+			var arrowLength = 0;
+			var playerNumber = 156;
+			var short_name = ["AE","AF","AL","AM","AO","AR","AT","AU","AZ","BA","BD","BE","BF","BG","BI","BJ","BN","BO","BR","BT","BW","BY","BZ","CA","CD","CF","CG","CH","CI","CL","CM","CN","CO","CR","CU","CY","CZ","DE","DJ","DK","DO","DZ","EC","EE","EG","ER","ES","ET","FI","FJ","FR","GA","GB","GE","GF","GH","GL","GM","GN","GQ","GR","GT","GW","GY","HN","HR","HT","HU","ID","IE","IL","IN","IQ","IR","IS","IT","JM","JO","JP","KE","KG","KH","KP","KR","KW","KZ","LA","LB","LK","LR","LS","LT","LU","LV","LY","MA","MD","MG","MK","ML","MM","MN","MR","MW","MX","MY","MZ","NA","NE","NG","NI","NL","NO","NP","NZ","OM","PA","PE","PG","PH","PK","PL","PR","PS","PT","PY","QA","RO","RS","RU","RW","SA","SB","SD","SE","SJ","SK","SL","SN","SO","SR","SV","SY","SZ","TD","TG","TH","TJ","TL","TM","TN","TR","TW","TZ","UA","UG","US","UY","UZ","VE","VN","VU","YE","ZA","ZM","ZW"];
+			var long_name = new Array();
+			var playingcountry;
+			var c=0;
+			var t;
+			var current = null;
+			var worldmap = {};
+			var m = {};
+			var attr = {};
+			var R;
+			var attackPath = new Array();
+			var attackPathPlayers = new Array();
+			
+			var actions = {};
+
+			var debug = false;
+			
+			// getIndexData();
+			// countrySelector();
+			// getCityList();
+			
+			
+    		window.onbeforeunload = function()
+			{
+				// unlock the player
+				// unlockCountry(short_name[playerNumber]); 
+			}
+			
+            window.onload = function() 
+			{			
+				$('playerchoicelink').simulate('click');
+				
+				// alert(data.US.fuel_exports);
+				
+				// TODO
+				// two finger pinch zoom
+				
+				// document.getElementById('testlink').onclick();
+					
+				// alert("Welcome to the play testing site for my game.\r\rImagine that WWII has come and gone and that the thirst for military domination has gone out of the world. In this post-colonialist world, power is gained through coercion and exploitation. The most fought over thing on the planet, oil, is beginning its gradual depletion, but it is still the largest factor driving the world's economies and armies. \r\rYour mission is to conquer the world. But you will not be able to do it by driving your war machine around the globe. You must use less direct means to conquer countries and fill your coffers.");
+				// this country's abbreviation 
+				
+				// TODO
+				// add player number picker
+				// auto assign player's country
+				// set playingcountry here:
+				playingcountry = short_name[playerNumber];
+
+
+				// lockCountry(playingcountry);
+				
+				// start the timer
+				// timedCount(playingcountry,playingcountry,playerNumber);
+				// initMinorCountries(short_name,playerResponse);
+				
+				// complete form setup, update other labels
+				document.getElementById('player').innerHTML = "<input type='hidden' value='" + playingcountry + "' />";
+				document.getElementById('playerspan').innerHTML = playingcountry;
+				document.getElementById('playernameid').innerHTML = playingcountry;
+				
+				// draw map
+				current = null;
+				worldmap = {};
+				m = {};
+				attr = 
+				{
+					fill: "#333",
+					stroke: "#888",
+					"stroke-width": .5,
+					"stroke-linejoin": "round"
+				};				
+				R = Raphael("holder");
+				zpd = new RaphaelZPD(R, { zoom: true, pan: true, drag: false });								
+				render_map(R,worldmap,attr);
+				
+				
+				// showAllPlayers();
+				
+				// worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
+				
+				// worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
+				// worldmap["IN"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["DE"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["GB"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["FR"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["IT"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// worldmap["JP"].animate({fill: "#fff", stroke: "#888"}, 300);				
+
+					
+				// when player selects an action from the drop down menu
+				// var selectmenu=document.getElementById("actions");
+				// selectmenu.onchange=function()
+				// { 
+				// 	var chosenoption=this.options[this.selectedIndex];
+				// 	if (chosenoption.value != "- internal -" && chosenoption.value != "- external -" && chosenoption.value != "-")
+				// 	{
+				// 		if (chosenoption.value == "skim" || chosenoption.value == "exploit" || chosenoption.value == "protect")
+				// 		{
+				// 			document.getElementById('target').innerHTML = document.getElementById('player').innerHTML;
+				// 			document.getElementById('targetspan').innerHTML = document.getElementById('playernameid').innerHTML;
+				// 			
+				// 			if (attackPath[0])
+				// 			{
+				// 				attackPath[0].remove();
+				// 			}
+				// 		} 
+				// 		else if (chosenoption.value == "invade" || chosenoption.value == "sanction" || chosenoption.value == "coup" || chosenoption.value == "support")
+				// 		{
+				// 			if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+				// 			{
+				// 				document.getElementById('target').innerHTML = '';
+				// 				document.getElementById('targetspan').innerHTML = '';
+				// 			} else
+				// 			{
+				// 				// showAction(document.getElementById('playernameid').innerHTML,document.getElementById('targetspan').innerHTML,chosenoption.value, 0, chosenoption.value);
+				// 			}
+				// 		}
+				// 	}
+				// }
+				
+				// when the player selects an index to color the map with
+				// var selectmenuindices = document.getElementById("indices");
+				// selectmenuindices.onchange = function()
+				// {
+				// 	var chosenoption = this.options[this.selectedIndex];
+				// 	if (chosenoption.value != "-")
+				// 	{
+				// 		updateMap(chosenoption.value);
+				// 		
+				// 	} else
+				// 	{
+						// clearMap();
+						
+						// showAllPlayers();
+						
+						// worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
+
+						// worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
+						// worldmap["IN"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["DE"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["GB"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["FR"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["IT"].animate({fill: "#fff", stroke: "#888"}, 300);
+						// worldmap["JP"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 	}
+				// }
+
+				// set mouseover and mouseout and onclick attributes
+				for (var state in worldmap) 
+				{							        
+    	            worldmap[state].color = Raphael.getColor();
+	                (function (st, state) 
+					{
+						st[0].onclick = function() 
+						{		
+							// var chosenoptionSelected = document.getElementById("actions").options[document.getElementById("actions").selectedIndex].value;
+							// if (chosenoptionSelected != 'skim' && chosenoptionSelected != 'protect')
+							// {
+							// 	var ajaxDisplayTargetSpan = document.getElementById('targetspan');							
+							// 	ajaxDisplayTargetSpan.innerHTML = state;
+							// 
+							// 	var ajaxDisplayTarget = document.getElementById('target');							
+							// 	ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
+							// }
+							// showAction(document.getElementById('playernameid').innerHTML,document.getElementById('targetspan').innerHTML,document.getElementById('actions').options[document.getElementById('actions').selectedIndex].value, 0, chosenoptionSelected);
+						};
+					})(worldmap[state], state);
+				}
+			};
+			
+        </script>
+    </head>
+
+
+
+    <body ontouchmove="BlockMove(event);">
+	<!-- <body> -->
+		<a id="playerchoicelink" href="popin/playerchoice.html" rel="gb_page_center[400, 300]" title="Choose Player Number"></a>
+		<a id="welcomelink" href="popin/welcome.html" rel="gb_page_center[400, 300]" title="Welcome"></a>
+		
+		<div class="gameboard">
+			<!-- titles -->
+			<div class="titlebar">
+				<div class="gametitle">GRAND AREA</div>
+				<div class="playername">A game of global hegemony<br><br>
+				</div><br><br>
+				<div style='position:relative; left:10px; top:-50px;'>
+					Current Player is: <span id="playernameid"></span>
+					<span style='position:relative; margin-left:940px; top:-5px;'>
+						<button class='button' style='height:40px;'>END TURN</a>
+					</span>
+				</div>
+			</div>
+			
+			<!--
+			<div class="playerstats"><u>Normalized Data (Max value is 1)</u><br>
+				Total Wealth: <span class="playertotalwealth" id='playertotalwealth'></span>
+				Family Wealth: <span class="playerfamilywealth" id='playerfamilywealth'></span>
+				Human Development: <span class="playerhumandevelopment" id='playerhumandevelopment'></span>
+				Armed Forces: <span class="playerarmedforces" id='playerarmedforces'></span>
+				Fuel Exports: <span class="playerfuelexports" id='playerfuelexports'></span>
+			</div>
+			-->
+		
+			<!-- Cities -->
+	        <div id="holder">
+	        </div>
+
+		
+			<!-- user interface, actions -->
+			<div class="actionsbar">
+				<!-- <form name='myForm' style="position:relative; top:15px; left:15px;">
+					ACTIONS MENU <br>
+				
+					Player: <span id='player'></span><span id='playerspan'></span><br>
+					Target: <span id='target'></span><span id='targetspan'></span><br><br><br><br><br><br>
+				
+					Action: <br><select id='actions'>
+						<option>-</option>
+						<option value="support">support</option>
+						<option value="invade">invade</option>
+						<option value="sanction">sanction</option>
+						<option value="coup">coup</option>
+					</select><br>
+					<input type='button' onclick='commitAction()' value='GO' />
+				</form><br><br> -->
+				
+				
+				<p style='position:relative; top:15px; left:15px;'>
+					Player: <span id='player'></span><span id='playerspan'></span><br>
+					Target: <span id='target'></span><span id='targetspan'></span><br><br>
+
+					<button class='button'>INVADE</button><br>
+					Strength advantage: <br><span id='strengthadvantage'></span><br>
+					
+					<button class='button'>COUP</button><br>
+					Wealth advantage: <br><span id='wealthadvantage'></span><br>
+					
+					<button class='button'>SANCTION</button><br>
+					Sanction counter: <br><span id='sanctioncounter'>2</span><br>
+									
+					<button class='button'>SUPPORT</button><br>
+					Support counter: <br><span id='supportcounter'>2</span><br>
+					<!-- show token images? allow drag and drop of tokens onto target country?<br> -->
+				</p>
+			</div><br>
+		
+		
+			<div class="infobar">
+				<div style='position:relative; left:15px; top:5px;'>
+					Current player's info<br>
+					fuel exports: <br>
+					total wealth: <br>
+					family wealth: <br>
+					human development: <br>
+					armed forces: <br>
+					<!-- numbers should be from 0 to 100? -->
+					
+				</div>
+				<div style='position:relative; left:400px; top:-120px;'>
+					Current target's info<br>
+					fuel exports: <br>
+					total wealth: <br>
+					family wealth: <br>
+					human development: <br>
+					armed forces: <br>
+					sanction status: <br>
+					support status: <br>
+
+					<!-- show list of all countries sanctioning or supporting this country?
+					show an index of the amount that it is sanctioned or supported? -->
+
+				</div>
+				<div style='position:relative; left:950px; top:-285px;'>
+					Highlight all countries by index<br>
+					<button id='totalwealth' class='button'>total wealth</button><br>
+					<button id='familywealth' class='button'>family wealth</button><br>
+					<button id='humandevelopment' class='button'>human development</button><br>
+					<button id='armedforces' class='button'>armed forces</button><br>
+					<button id='fuelexports' class='button'>fuel exports</button><br>
+					<!-- <form name='sortcountries' style='position:relative; top:915px; left:35px;'>
+						View countries by index:<br>
+						<select id='indices'>
+							<option>-</option> -->
+					
+							<!-- 
+							TODO
+							add graphical representation of the amount of exploitation of a country, either the player's, 
+							add graphical representation of the amount each country is being exploited by all players
+							-->
+					
+							<!-- <option value="total_wealth">total wealth</option>
+							<option value="family_wealth">family wealth</option>
+							<option value="human_development">human development</option>
+							<option value="armed_forces">armed forces</option>
+							<option value="fuel_exports">fuel exports</option>
+						</select>
+					</form><br><br> -->
+				</div>
+				
+			</div><br><br>
+		
+			<!--
+			<div style="position:relative; top:-200px; left:100px;"><u>Normalized Data (Max value is 1)</u><br>
+				Country Name: <span id='countryshortname'></span><br>
+				Country Wealth: <span id='countrytotalwealth'></span><br>
+				Family Wealth: <span id='countryfamilywealth'></span><br>
+				Human Development: <span id='countryhumandevelopment'></span><br>
+				Armed Forces: <span id='countryarmedforces'></span><br>
+				Fuel Exports: <span id='countryfuelexports'></span><br>
+			</div><br><br>
+		
+			<div style="position:relative; top:-200px; left:100px;">
+				Attack Distance: <span id='arrowlength'></span>
+			</div>
+			-->
+			<br><br>
+		</div>
+	</body>
+</html>
+
+
+
+
+
+
+
+
