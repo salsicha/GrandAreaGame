@@ -88,6 +88,8 @@ needs to zoom when touching water (make water svg object?)
 			var R;
 			var attackPath = new Array();
 			var attackPathPlayers = new Array();
+			var selected_action;
+			var selected_action_value;
 			
 			var actions = {};
 
@@ -106,7 +108,7 @@ needs to zoom when touching water (make water svg object?)
 			
             window.onload = function() 
 			{			
-				$('playerchoicelink').simulate('click');
+				// $('playerchoicelink').simulate('click');
 				
 				// alert(data.US.fuel_exports);
 				
@@ -156,7 +158,7 @@ needs to zoom when touching water (make water svg object?)
 				
 				// worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
 				
-				// worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
+				worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
 				// worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
 				// worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
 				// worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
@@ -193,41 +195,56 @@ needs to zoom when touching water (make water svg object?)
 				// 				document.getElementById('targetspan').innerHTML = '';
 				// 			} else
 				// 			{
-				// 				// showAction(document.getElementById('playernameid').innerHTML,document.getElementById('targetspan').innerHTML,chosenoption.value, 0, chosenoption.value);
+				// 				showAction(document.getElementById('playernameid').innerHTML,document.getElementById('targetspan').innerHTML,chosenoption.value, 0, chosenoption.value);
 				// 			}
 				// 		}
 				// 	}
 				// }
 				
+				var coupbutton=document.getElementById("coup_button");
+				coupbutton.onchange=function()
+				{
+					selected_action = 'coup';
+					selected_action_value = 2;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					{
+						document.getElementById('target').innerHTML = '';
+						document.getElementById('targetspan').innerHTML = '';
+					} else
+					{
+						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, chosenoption.value, 0, chosenoption.value);
+					}
+				}
+				
 				// when the player selects an index to color the map with
-				// var selectmenuindices = document.getElementById("indices");
-				// selectmenuindices.onchange = function()
-				// {
-				// 	var chosenoption = this.options[this.selectedIndex];
-				// 	if (chosenoption.value != "-")
-				// 	{
-				// 		updateMap(chosenoption.value);
-				// 		
-				// 	} else
-				// 	{
-						// clearMap();
+				var selectmenuindices = document.getElementById("indices");
+				selectmenuindices.onchange = function()
+				{
+					var chosenoption = this.options[this.selectedIndex];
+					if (chosenoption.value != "-")
+					{
+						updateMap(chosenoption.value);
 						
-						// showAllPlayers();
+					} else
+					{
+						clearMap();
 						
-						// worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
+						showAllPlayers();
+						
+						worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
 
-						// worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
-						// worldmap["IN"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["DE"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["GB"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["FR"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["IT"].animate({fill: "#fff", stroke: "#888"}, 300);
-						// worldmap["JP"].animate({fill: "#fff", stroke: "#888"}, 300);
-				// 	}
-				// }
+						worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
+						worldmap["IN"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["DE"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["GB"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["FR"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["IT"].animate({fill: "#fff", stroke: "#888"}, 300);
+						worldmap["JP"].animate({fill: "#fff", stroke: "#888"}, 300);
+					}
+				}
 
 				// set mouseover and mouseout and onclick attributes
 				for (var state in worldmap) 
@@ -240,13 +257,14 @@ needs to zoom when touching water (make water svg object?)
 							// var chosenoptionSelected = document.getElementById("actions").options[document.getElementById("actions").selectedIndex].value;
 							// if (chosenoptionSelected != 'skim' && chosenoptionSelected != 'protect')
 							// {
-							// 	var ajaxDisplayTargetSpan = document.getElementById('targetspan');							
-							// 	ajaxDisplayTargetSpan.innerHTML = state;
-							// 
-							// 	var ajaxDisplayTarget = document.getElementById('target');							
-							// 	ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
+								var ajaxDisplayTargetSpan = document.getElementById('targetspan');							
+								ajaxDisplayTargetSpan.innerHTML = state;
+							
+								var ajaxDisplayTarget = document.getElementById('target');							
+								ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
 							// }
-							// showAction(document.getElementById('playernameid').innerHTML,document.getElementById('targetspan').innerHTML,document.getElementById('actions').options[document.getElementById('actions').selectedIndex].value, 0, chosenoptionSelected);
+							// showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, document.getElementById('actions').options[document.getElementById('actions').selectedIndex].value, 0, chosenoptionSelected);
+							showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action_value, 0, selected_action);
 						};
 					})(worldmap[state], state);
 				}
@@ -297,7 +315,7 @@ needs to zoom when touching water (make water svg object?)
 					ACTIONS MENU <br>
 				
 					Player: <span id='player'></span><span id='playerspan'></span><br>
-					Target: <span id='target'></span><span id='targetspan'></span><br><br><br><br><br><br>
+					Target: <span id='target'></span><span id='targetspan'></span><br><br>
 				
 					Action: <br><select id='actions'>
 						<option>-</option>
@@ -314,16 +332,16 @@ needs to zoom when touching water (make water svg object?)
 					Player: <span id='player'></span><span id='playerspan'></span><br>
 					Target: <span id='target'></span><span id='targetspan'></span><br><br>
 
-					<button class='button'>INVADE</button><br>
+					<button class='button' id='invade_button'>INVADE</button><br>
 					Strength advantage: <br><span id='strengthadvantage'></span><br>
 					
-					<button class='button'>COUP</button><br>
+					<button class='button' id='coup_button'>COUP</button><br>
 					Wealth advantage: <br><span id='wealthadvantage'></span><br>
 					
-					<button class='button'>SANCTION</button><br>
+					<button class='button' id='sanction_button'>SANCTION</button><br>
 					Sanction counter: <br><span id='sanctioncounter'>2</span><br>
 									
-					<button class='button'>SUPPORT</button><br>
+					<button class='button' id='support_button'>SUPPORT</button><br>
 					Support counter: <br><span id='supportcounter'>2</span><br>
 					<!-- show token images? allow drag and drop of tokens onto target country?<br> -->
 				</p>
@@ -362,10 +380,10 @@ needs to zoom when touching water (make water svg object?)
 					<button id='humandevelopment' class='button'>human development</button><br>
 					<button id='armedforces' class='button'>armed forces</button><br>
 					<button id='fuelexports' class='button'>fuel exports</button><br>
-					<!-- <form name='sortcountries' style='position:relative; top:915px; left:35px;'>
+					<form name='sortcountries' style='position:relative; top:915px; left:35px;'>
 						View countries by index:<br>
 						<select id='indices'>
-							<option>-</option> -->
+							<option>-</option>
 					
 							<!-- 
 							TODO
@@ -373,13 +391,13 @@ needs to zoom when touching water (make water svg object?)
 							add graphical representation of the amount each country is being exploited by all players
 							-->
 					
-							<!-- <option value="total_wealth">total wealth</option>
+							<option value="total_wealth">total wealth</option>
 							<option value="family_wealth">family wealth</option>
 							<option value="human_development">human development</option>
 							<option value="armed_forces">armed forces</option>
 							<option value="fuel_exports">fuel exports</option>
 						</select>
-					</form><br><br> -->
+					</form><br><br>
 				</div>
 				
 			</div><br><br>
