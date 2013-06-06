@@ -1,5 +1,6 @@
 ﻿
 <!-- 
+
 TODO
 End Turn button should switch players
 Sanction and Support buttons should be drag-n-droppable tokens with number indicator
@@ -90,6 +91,7 @@ needs to zoom when touching water (make water svg object?)
 			var attackPathPlayers = new Array();
 			var selected_action;
 			var selected_action_value;
+			var highlight_index;
 			
 			var actions = {};
 
@@ -117,7 +119,7 @@ needs to zoom when touching water (make water svg object?)
 				
 				// document.getElementById('testlink').onclick();
 					
-				// alert("Welcome to the play testing site for my game.\r\rImagine that WWII has come and gone and that the thirst for military domination has gone out of the world. In this post-colonialist world, power is gained through coercion and exploitation. The most fought over thing on the planet, oil, is beginning its gradual depletion, but it is still the largest factor driving the world's economies and armies. \r\rYour mission is to conquer the world. But you will not be able to do it by driving your war machine around the globe. You must use less direct means to conquer countries and fill your coffers.");
+				alert("Imagine that WWII has come and gone and that the thirst for military domination has gone out of the world. In this post-colonialist world, power is gained through coercion and exploitation. The most fought over thing on the planet, oil, is beginning its gradual depletion, but it is still the largest factor driving the world's economies and armies. \r\rYour mission is to conquer the world. But you may not be able to do it by driving your war machine around the globe. You must use less direct means to conquer countries and fill your coffers.");
 				// this country's abbreviation 
 				
 				// TODO
@@ -201,8 +203,23 @@ needs to zoom when touching water (make water svg object?)
 				// 	}
 				// }
 				
+				var invadebutton=document.getElementById("invade_button");
+				invadebutton.onclick=function()
+				{
+					selected_action = 'invade';
+					selected_action_value = 1;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					{
+						document.getElementById('target').innerHTML = '';
+						document.getElementById('targetspan').innerHTML = '';
+					} else
+					{
+						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
+					}
+				}
+
 				var coupbutton=document.getElementById("coup_button");
-				coupbutton.onchange=function()
+				coupbutton.onclick=function()
 				{
 					selected_action = 'coup';
 					selected_action_value = 2;
@@ -212,39 +229,99 @@ needs to zoom when touching water (make water svg object?)
 						document.getElementById('targetspan').innerHTML = '';
 					} else
 					{
-						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, chosenoption.value, 0, chosenoption.value);
+						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
 					}
 				}
 				
-				// when the player selects an index to color the map with
-				var selectmenuindices = document.getElementById("indices");
-				selectmenuindices.onchange = function()
+				var sanctionbutton=document.getElementById("sanction_button");
+				sanctionbutton.onclick=function()
 				{
-					var chosenoption = this.options[this.selectedIndex];
-					if (chosenoption.value != "-")
+					selected_action = 'sanction';
+					selected_action_value = 3;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
 					{
-						updateMap(chosenoption.value);
-						
+						document.getElementById('target').innerHTML = '';
+						document.getElementById('targetspan').innerHTML = '';
 					} else
 					{
-						clearMap();
-						
-						showAllPlayers();
-						
-						worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
-
-						worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
-						worldmap["IN"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["DE"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["GB"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["FR"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["IT"].animate({fill: "#fff", stroke: "#888"}, 300);
-						worldmap["JP"].animate({fill: "#fff", stroke: "#888"}, 300);
+						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
 					}
 				}
+				
+				var supportbutton=document.getElementById("support_button");
+				sanctionbutton.onclick=function()
+				{
+					selected_action = 'support';
+					selected_action_value = 4;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					{
+						document.getElementById('target').innerHTML = '';
+						document.getElementById('targetspan').innerHTML = '';
+					} else
+					{
+						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
+					}
+				}
+				
+				var wealth_highlight_button = document.getElementById("totalwealth");
+				wealth_highlight_button.onclick = function()
+				{
+					updateMap("total_wealth");
+				}
+				
+				var family_wealth_highlight_button = document.getElementById("familywealth");
+				family_wealth_highlight_button.onclick = function()
+				{
+					updateMap("family_wealth");
+				}
+				
+				var human_development_highlight_button = document.getElementById("humandevelopment");
+				human_development_highlight_button.onclick = function()
+				{
+					updateMap("human_development");
+				}
+				
+				var armed_forces_highlight_button = document.getElementById("armedforces");
+				armed_forces_highlight_button.onclick = function()
+				{
+					updateMap("armed_forces");
+				}
+				
+				var fuel_exports_highlight_button = document.getElementById("fuelexports");
+				fuel_exports_highlight_button.onclick = function()
+				{
+					updateMap("fuel_exports");
+				}
+				
+				// when the player selects an index to color the map with
+				// var selectmenuindices = document.getElementById("indices");
+				// selectmenuindices.onchange = function()
+				// {
+				// 	var chosenoption = this.options[this.selectedIndex];
+				// 	if (chosenoption.value != "-")
+				// 	{
+				// 		updateMap(chosenoption.value);
+				// 		
+				// 	} else
+				// 	{
+				// 		clearMap();
+				// 		
+				// 		showAllPlayers();
+				// 		
+				// 		worldmap[playingcountry].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 
+				// 		worldmap["US"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["RU"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["BR"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["CN"].animate({fill: "#fff", stroke: "#888"}, 300);			
+				// 		worldmap["IN"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["DE"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["GB"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["FR"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["IT"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 		worldmap["JP"].animate({fill: "#fff", stroke: "#888"}, 300);
+				// 	}
+				// }
 
 				// set mouseover and mouseout and onclick attributes
 				for (var state in worldmap) 
@@ -288,7 +365,7 @@ needs to zoom when touching water (make water svg object?)
 				</div><br><br>
 				<div style='position:relative; left:10px; top:-50px;'>
 					Current Player is: <span id="playernameid"></span>
-					<span style='position:relative; margin-left:940px; top:-5px;'>
+					<span style='position:relative; margin-left:900px; top:-5px;'>
 						<button class='button' style='height:40px;'>END TURN</a>
 					</span>
 				</div>
@@ -349,7 +426,7 @@ needs to zoom when touching water (make water svg object?)
 		
 		
 			<div class="infobar">
-				<div style='position:relative; left:15px; top:5px;'>
+				<div style='position:relative; left:15px; top:7px;'>
 					Current player's info<br>
 					fuel exports: <br>
 					total wealth: <br>
@@ -359,7 +436,7 @@ needs to zoom when touching water (make water svg object?)
 					<!-- numbers should be from 0 to 100? -->
 					
 				</div>
-				<div style='position:relative; left:400px; top:-120px;'>
+				<div style='position:relative; left:300px; top:-100px;'>
 					Current target's info<br>
 					fuel exports: <br>
 					total wealth: <br>
@@ -373,23 +450,22 @@ needs to zoom when touching water (make water svg object?)
 					show an index of the amount that it is sanctioned or supported? -->
 
 				</div>
-				<div style='position:relative; left:950px; top:-285px;'>
+				<div style='position:relative; left:650px; top:-250px;'>
 					Highlight all countries by index<br>
 					<button id='totalwealth' class='button'>total wealth</button><br>
 					<button id='familywealth' class='button'>family wealth</button><br>
-					<button id='humandevelopment' class='button'>human development</button><br>
-					<button id='armedforces' class='button'>armed forces</button><br>
-					<button id='fuelexports' class='button'>fuel exports</button><br>
-					<form name='sortcountries' style='position:relative; top:915px; left:35px;'>
+					<button id='humandevelopment' class='button' style="position:relative; left:50px;">human development</button><br>
+					<button id='armedforces' class='button' style="position:relative; top:-150px; left:150px;">armed forces</button><br>
+					<button id='fuelexports' class='button' style="position:relative; top:-150px; left:150px;">fuel exports</button><br>
+					
+					<!-- <form name='sortcountries' style='position:absolute; top:0px; left:335px;'>
 						View countries by index:<br>
 						<select id='indices'>
 							<option>-</option>
 					
-							<!-- 
-							TODO
-							add graphical representation of the amount of exploitation of a country, either the player's, 
-							add graphical representation of the amount each country is being exploited by all players
-							-->
+							// TODO
+							// add graphical representation of the amount of exploitation of a country, either the player's, 
+							// add graphical representation of the amount each country is being exploited by all players
 					
 							<option value="total_wealth">total wealth</option>
 							<option value="family_wealth">family wealth</option>
@@ -397,7 +473,7 @@ needs to zoom when touching water (make water svg object?)
 							<option value="armed_forces">armed forces</option>
 							<option value="fuel_exports">fuel exports</option>
 						</select>
-					</form><br><br>
+					</form><br><br> -->
 				</div>
 				
 			</div><br><br>
@@ -411,11 +487,12 @@ needs to zoom when touching water (make water svg object?)
 				Armed Forces: <span id='countryarmedforces'></span><br>
 				Fuel Exports: <span id='countryfuelexports'></span><br>
 			</div><br><br>
+			-->
 		
-			<div style="position:relative; top:-200px; left:100px;">
+			<div style="position:relative; top:-100px; left:10px;">
 				Attack Distance: <span id='arrowlength'></span>
 			</div>
-			-->
+			
 			<br><br>
 		</div>
 	</body>
