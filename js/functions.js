@@ -1,6 +1,6 @@
 /////
 
-function BlockMove(event) 
+function BlockMove(event)
 {
 	// Tell Safari not to move the window.
 	event.preventDefault() ;
@@ -75,19 +75,39 @@ function countrySelector()
 
 }
 
-function lon2x(lon) 
+function lon2x(lon)
 {
-	var xfactor = 2.6938;
-	var xoffset = 465.4;
-	var x = (lon * xfactor) + xoffset;
+	// int x =  (int) ((MAP_WIDTH/360.0) * (180 + lon));
+	
+	// var xfactor = 2.6938;
+	// var xoffset = 465.4;
+	
+	// var xfactor = -1;
+	// var xoffset = 490;
+	
+	// var xfactor = -2;
+	// var xoffset = 300;
+	
+	// var x = (lon * xfactor) + xoffset;
+	var x = 490 - ((980/360.0) * (180 + lon));
 	return x;
 }
 
-function lat2y(lat) 
+function lat2y(lat)
 {
-	var yfactor = -2.6938;
-	var yoffset = 227.066;
-	var y = (lat * yfactor) + yoffset;
+	// int y =  (int) ((MAP_HEIGHT/180.0) * (90 - lat));
+	
+	// var yfactor = -2.6938;
+	// var yoffset = 227.066;
+	
+	// var yfactor = 1;
+	// var yoffset = 250;
+	
+	// var yfactor = 4;
+	// var yoffset = 465;
+	
+	// var y = (lat * yfactor) + yoffset;
+	var y = 250 - ((500/180.0) * (90 - lat));
 	return y;
 }
 
@@ -208,20 +228,40 @@ function showAction(player, target, selectedActionValue, place, type)
 	var endy = 0;
 	var size = 8;
 	
+	// console.log(data);
+	
 	if (target)
 	{
-		for (counter in city_name)
+		for (counter in short_name)
 		{
+			// console.log(data[short_name[counter]]["city_x"]);
+			
 			if (short_name[counter] == target)
 			{
-				endy = lat2y(lat_y[counter]);
-				endx = lon2x(lon_x[counter]);
+				// endy = lat2y(lat_y[counter]);
+				// endx = lon2x(lon_x[counter]);
+
+				// endy = lat2y(data[short_name[counter]]["city_y"]);
+				// endx = lon2x(data[short_name[counter]]["city_x"]);
+				
+				endy = -47.55;
+				endx = -15.47;
+				
+				endy = lat2y(-47.55);
+				endx = lon2x(-15.47);
+				
 			}
 		
 			if (short_name[counter] == player)
 			{
-				starty = lat2y(lat_y[counter]);
-				startx = lon2x(lon_x[counter]);
+				// starty = lat2y(lat_y[counter]);
+				// startx = lon2x(lon_x[counter]);
+				
+				// starty = lat2y(data[short_name[counter]]["city_y"]);
+				// startx = lon2x(data[short_name[counter]]["city_x"]);
+				
+				starty = 250;
+				startx = 490;
 			}
 		}
 	
@@ -277,6 +317,9 @@ function showAction(player, target, selectedActionValue, place, type)
 			
 			arrowLength = Math.sqrt(xdif*xdif+ydif*ydif)/700;
 			document.getElementById('arrowlength').innerHTML = arrowLength;
+			// console.log("start x: " + startx);
+			// console.log("end x: " + endx);
+			// console.log("new x 1: " + newx1);
 			attackPath[place] = R.path("M"+startx+" "+starty+" L"+endx+" "+endy+" L"+(endx+newx1)+" "+(endy+newy1)+" L"+(endx+newx2)+" "+(endy+newy2)+" L"+endx+" "+endy).attr({stroke: linecolor});
 		} 
 	}
