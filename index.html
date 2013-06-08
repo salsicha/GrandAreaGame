@@ -89,7 +89,7 @@ needs to zoom when touching water (make water svg object?)
 			var attackPath = new Array();
 			var attackPathPlayers = new Array();
 			var selected_action;
-			var selected_action_value;
+			// var selected_action_value;
 			var highlight_index;
 			
 			var actions = {};
@@ -137,7 +137,7 @@ needs to zoom when touching water (make water svg object?)
 				// complete form setup, update other labels
 				document.getElementById('player').innerHTML = "<input type='hidden' value='" + playingcountry + "' />";
 				document.getElementById('playerspan').innerHTML = playingcountry;
-				document.getElementById('playernameid').innerHTML = playingcountry;
+				// document.getElementById('playernameid').innerHTML = playingcountry;
 				
 				// draw map
 				current = null;
@@ -206,14 +206,14 @@ needs to zoom when touching water (make water svg object?)
 				invadebutton.onclick=function()
 				{
 					selected_action = 'invade';
-					selected_action_value = 1;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					// selected_action_value = 1;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
 					{
 						document.getElementById('target').innerHTML = '';
 						document.getElementById('targetspan').innerHTML = '';
 					} else
 					{
-						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
+						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
 					}
 				}
 
@@ -221,14 +221,14 @@ needs to zoom when touching water (make water svg object?)
 				coupbutton.onclick=function()
 				{
 					selected_action = 'coup';
-					selected_action_value = 2;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					// selected_action_value = 2;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
 					{
 						document.getElementById('target').innerHTML = '';
 						document.getElementById('targetspan').innerHTML = '';
 					} else
 					{
-						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
+						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
 					}
 				}
 				
@@ -236,14 +236,14 @@ needs to zoom when touching water (make water svg object?)
 				sanctionbutton.onclick=function()
 				{
 					selected_action = 'sanction';
-					selected_action_value = 3;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					// selected_action_value = 3;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
 					{
 						document.getElementById('target').innerHTML = '';
 						document.getElementById('targetspan').innerHTML = '';
 					} else
 					{
-						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
+						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
 					}
 				}
 				
@@ -251,14 +251,14 @@ needs to zoom when touching water (make water svg object?)
 				sanctionbutton.onclick=function()
 				{
 					selected_action = 'support';
-					selected_action_value = 4;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playernameid').innerHTML)
+					// selected_action_value = 4;
+					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
 					{
 						document.getElementById('target').innerHTML = '';
 						document.getElementById('targetspan').innerHTML = '';
 					} else
 					{
-						showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action, 0, selected_action);
+						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
 					}
 				}
 				
@@ -340,7 +340,7 @@ needs to zoom when touching water (make water svg object?)
 								ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
 							// }
 							// showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, document.getElementById('actions').options[document.getElementById('actions').selectedIndex].value, 0, chosenoptionSelected);
-							showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, selected_action_value, 0, selected_action);
+							showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
 						};
 					})(worldmap[state], state);
 				}
@@ -363,10 +363,10 @@ needs to zoom when touching water (make water svg object?)
 				<div class="playername">A game of global hegemony<br><br>
 				</div><br><br>
 				<div style='position:relative; left:10px; top:-50px;'>
-					Current Player is: <span id="playernameid"></span>
-					<span style='position:relative; margin-left:900px; top:-5px;'>
+					<!-- Current Player is: <span id="playernameid"></span> -->
+					<!-- <span style='position:relative; margin-left:900px; top:-5px;'>
 						<button class='button' style='height:40px;'>END TURN</a>
-					</span>
+					</span> -->
 				</div>
 			</div>
 			
@@ -409,16 +409,16 @@ needs to zoom when touching water (make water svg object?)
 					Target: <span id='target'></span><span id='targetspan'></span><br><br>
 
 					<button class='button' id='invade_button'>INVADE</button><br>
-					Strength advantage: <br><span id='strengthadvantage'></span><br>
+					<!-- Strength advantage: <br><span id='strengthadvantage'></span><br> -->
 					
 					<button class='button' id='coup_button'>COUP</button><br>
-					Wealth advantage: <br><span id='wealthadvantage'></span><br>
+					<!-- Wealth advantage: <br><span id='wealthadvantage'></span><br> -->
 					
 					<button class='button' id='sanction_button'>SANCTION</button><br>
-					Sanction counter: <br><span id='sanctioncounter'>2</span><br>
+					<!-- Sanction counter: <br><span id='sanctioncounter'>2</span><br> -->
 									
 					<button class='button' id='support_button'>SUPPORT</button><br>
-					Support counter: <br><span id='supportcounter'>2</span><br>
+					<!-- Support counter: <br><span id='supportcounter'>2</span><br> -->
 					<!-- show token images? allow drag and drop of tokens onto target country?<br> -->
 				</p>
 			</div><br>
@@ -426,7 +426,7 @@ needs to zoom when touching water (make water svg object?)
 		
 			<div class="infobar">
 				<div style='position:relative; left:15px; top:7px;'>
-					Current player's info<br>
+					US info<br>
 					fuel exports: <br>
 					total wealth: <br>
 					family wealth: <br>
@@ -488,9 +488,9 @@ needs to zoom when touching water (make water svg object?)
 			</div><br><br>
 			-->
 		
-			<div style="position:relative; top:-100px; left:10px;">
-				Attack Distance: <span id='arrowlength'></span>
-			</div>
+			<!-- <div style="position:relative; top:-100px; left:10px;">
+				Attack Distance: <span id='arrowlength' maxlength='5'></span>
+			</div> -->
 			
 			<br><br>
 		</div>

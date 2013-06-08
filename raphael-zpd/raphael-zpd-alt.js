@@ -1,5 +1,4 @@
 
-
 var raphaelZPDId = 0;
 
 RaphaelZPD = function(raphaelPaper, o) {
@@ -166,162 +165,146 @@ RaphaelZPD = function(raphaelPaper, o) {
 			element.setAttributeNS(null, i, attributes[i]);
 	};
 
-////
-
-
-
-
-
-me.handleGestureChange = function(evt) 
-{
-	// event.scale
-	// evt.scale
+	me.handleGestureChange = function(evt) 
+	{
+		// event.scale
+		// evt.scale
 	
-	if (!me.opts.zoom) return;
+		if (!me.opts.zoom) return;
 
-	if (evt.preventDefault)
-		evt.preventDefault();
+		if (evt.preventDefault)
+			evt.preventDefault();
 
-	evt.returnValue = false;
+		evt.returnValue = false;
 
-	var svgDoc = evt.target.ownerDocument;
+		var svgDoc = evt.target.ownerDocument;
 
-	var delta;
+		var delta;
 
-	// if (evt.wheelDelta)
-	// 	delta = evt.wheelDelta / 3600; // Chrome/Safari
-	// else
-	// 	delta = evt.detail / -90; // Mozilla
+		// if (evt.wheelDelta)
+		// 	delta = evt.wheelDelta / 3600; // Chrome/Safari
+		// else
+		// 	delta = evt.detail / -90; // Mozilla
 
-	delta = (evt.scale - 1)/20;
+		delta = (evt.scale - 1)/20;
 
-	// alert(evt.scale);
+		// alert(evt.scale);
 
-    if (delta > 0) {
-        if (me.opts.zoomThreshold) 
-            if (me.opts.zoomThreshold[1] <= me.zoomCurrent) return;
-        me.zoomCurrent++;
-    } else {
-        if (me.opts.zoomThreshold)
-            if (me.opts.zoomThreshold[0] >= me.zoomCurrent) return;
-        me.zoomCurrent--;
-    }
+	    if (delta > 0) {
+	        if (me.opts.zoomThreshold) 
+	            if (me.opts.zoomThreshold[1] <= me.zoomCurrent) return;
+	        me.zoomCurrent++;
+	    } else {
+	        if (me.opts.zoomThreshold)
+	            if (me.opts.zoomThreshold[0] >= me.zoomCurrent) return;
+	        me.zoomCurrent--;
+	    }
 
-	var z = 1 + delta; // Zoom factor: 0.9/1.1
+		var z = 1 + delta; // Zoom factor: 0.9/1.1
 
-	var g = svgDoc.getElementById("viewport"+me.id);
+		var g = svgDoc.getElementById("viewport"+me.id);
 	
-	// calculate center????
-	var p = me.getEventPoint(me.touchA);
+		// calculate center????
+		var p = me.getEventPoint(me.touchA);
 
-	p = p.matrixTransform(g.getCTM().inverse());
-
-	// Compute new scale matrix in current mouse position
-	var k = me.root.createSVGMatrix().translate(p.x, p.y).scale(z).translate(-p.x, -p.y);
-	me.setCTM(g, g.getCTM().multiply(k));
-
-	if (!me.stateTf)
-		me.stateTf = g.getCTM().inverse();
-
-	me.stateTf = me.stateTf.multiply(k.inverse());
-};
-
-
-me.handleTouchMove = function(evt) {
-	// alert("move");
-	if (evt.preventDefault)
-		evt.preventDefault();
-
-	evt.returnValue = false;
-
-	var svgDoc = evt.target.ownerDocument;
-
-	var g = svgDoc.getElementById("viewport"+me.id);
-
-	if (me.state == 'pan') {
-		// Pan mode
-		if (!me.opts.pan) return;
-
-		var p = me.getEventPoint(me.touchA).matrixTransform(me.stateTf);
-
-		me.setCTM(g, me.stateTf.inverse().translate(p.x - me.stateOrigin.x, p.y - me.stateOrigin.y));
-	} else if (me.state == 'move') {
-		// Move mode
-		if (!me.opts.drag) return;
-
-		var p = me.getEventPoint(me.touchA).matrixTransform(g.getCTM().inverse());
-
-		me.setCTM(me.stateTarget, me.root.createSVGMatrix().translate(p.x - me.stateOrigin.x, p.y - me.stateOrigin.y).multiply(g.getCTM().inverse()).multiply(me.stateTarget.getCTM()));
-
-		me.stateOrigin = p;
-	}
-};
-
-
-me.handleTouchStart = function(evt) {
-	// alert(evt.target.tagName);
+		p = p.matrixTransform(g.getCTM().inverse());
 	
-	me.touchA = evt.touches[0];
-	me.touchB = evt.touches[1];
+		// Compute new scale matrix in current mouse position
+		var k = me.root.createSVGMatrix().translate(p.x, p.y).scale(z).translate(-p.x, -p.y);
+		me.setCTM(g, g.getCTM().multiply(k));
+
+		if (!me.stateTf)
+			me.stateTf = g.getCTM().inverse();
+
+		me.stateTf = me.stateTf.multiply(k.inverse());
+	};
+
+
+	me.handleTouchMove = function(evt) {
+		// alert("move");
+		if (evt.preventDefault)
+			evt.preventDefault();
+
+		evt.returnValue = false;
+
+		var svgDoc = evt.target.ownerDocument;
+
+		var g = svgDoc.getElementById("viewport"+me.id);
+
+		if (me.state == 'pan') {
+			// Pan mode
+			if (!me.opts.pan) return;
+
+			var p = me.getEventPoint(me.touchA).matrixTransform(me.stateTf);
+
+			me.setCTM(g, me.stateTf.inverse().translate(p.x - me.stateOrigin.x, p.y - me.stateOrigin.y));
+		} else if (me.state == 'move') {
+			// Move mode
+			if (!me.opts.drag) return;
+
+			var p = me.getEventPoint(me.touchA).matrixTransform(g.getCTM().inverse());
+
+			me.setCTM(me.stateTarget, me.root.createSVGMatrix().translate(p.x - me.stateOrigin.x, p.y - me.stateOrigin.y).multiply(g.getCTM().inverse()).multiply(me.stateTarget.getCTM()));
+
+			me.stateOrigin = p;
+		}
+	};
+
+
+	me.handleTouchStart = function(evt) {
+		// alert(evt.target.tagName);
 	
-	if (evt.preventDefault)
-		evt.preventDefault();
-
-	evt.returnValue = false;
-
-	var svgDoc = evt.target.ownerDocument;
-
-	var g = svgDoc.getElementById("viewport"+me.id);
+		me.touchA = evt.touches[0];
+		me.touchB = evt.touches[1];
 	
-	// alert(g);
+		if (evt.preventDefault)
+			evt.preventDefault();
 
-	if (evt.target.tagName == "svg" || !me.opts.drag) {
-		// Pan mode
-		if (!me.opts.pan) return;
+		evt.returnValue = false;
 
-		me.state = 'pan';
+		var svgDoc = evt.target.ownerDocument;
 
-		me.stateTf = g.getCTM().inverse();
+		var g = svgDoc.getElementById("viewport"+me.id);
+	
+		// alert(g);
 
-		me.stateOrigin = me.getEventPoint(me.touchA).matrixTransform(me.stateTf);			
-	} else {
-		// Move mode
-		if (!me.opts.drag || evt.target.draggable == false) return;
+		if (evt.target.tagName == "svg" || !me.opts.drag) {
+			// Pan mode
+			if (!me.opts.pan) return;
 
-		me.state = 'move';
+			me.state = 'pan';
 
-		me.stateTarget = evt.target;
+			me.stateTf = g.getCTM().inverse();
 
-		me.stateTf = g.getCTM().inverse();
+			me.stateOrigin = me.getEventPoint(me.touchA).matrixTransform(me.stateTf);			
+		} else {
+			// Move mode
+			if (!me.opts.drag || evt.target.draggable == false) return;
 
-		me.stateOrigin = me.getEventPoint(me.touchA).matrixTransform(me.stateTf);
-	}
-};
+			me.state = 'move';
 
+			me.stateTarget = evt.target;
 
-me.handleTouchEnd = function(evt) {
-	if (evt.preventDefault)
-		evt.preventDefault();
+			me.stateTf = g.getCTM().inverse();
 
-	evt.returnValue = false;
-
-	var svgDoc = evt.target.ownerDocument;
-
-	if ((me.state == 'pan' && me.opts.pan) || (me.state == 'move' && me.opts.drag)) {
-		// Quit pan mode
-		me.state = '';
-	}
-};
+			me.stateOrigin = me.getEventPoint(me.touchA).matrixTransform(me.stateTf);
+		}
+	};
 
 
+	me.handleTouchEnd = function(evt) {
+		if (evt.preventDefault)
+			evt.preventDefault();
 
+		evt.returnValue = false;
 
+		var svgDoc = evt.target.ownerDocument;
 
-
-
-
-
-////
+		if ((me.state == 'pan' && me.opts.pan) || (me.state == 'move' && me.opts.drag)) {
+			// Quit pan mode
+			me.state = '';
+		}
+	};
 
 	/**
 	 * Handle mouse move event.
@@ -361,8 +344,14 @@ me.handleTouchEnd = function(evt) {
 		var g = svgDoc.getElementById("viewport"+me.id);
 		
 		var p = me.getEventPoint(evt);
+	
+		p.x -= 320;
+		p.y -= 120;
 
 		p = p.matrixTransform(g.getCTM().inverse());
+		
+		// console.log("inv x: " + p.x);
+		// console.log("inv y: " + p.y);
 
 		// Compute new scale matrix in current mouse position
 		var k = me.root.createSVGMatrix().translate(p.x, p.y).scale(z).translate(-p.x, -p.y);
