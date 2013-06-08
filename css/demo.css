@@ -24,8 +24,8 @@ p a
 	border: 2px solid #ffffff;
 	margin: 0px auto;
 	width: 1185px;
-	height: 805px;
-	top: 10px;
+	height: 775px;
+	top: 5px;
 }
 
 .titlebar
@@ -33,7 +33,7 @@ p a
 	position:relative;
 	top: 0px;
 	left: 0px;
-    height: 100px;
+    height: 90px;
     margin: 0px auto;
     width: 1180px;
 	border: 2px solid #ffffff;
@@ -42,7 +42,7 @@ p a
 .actionsbar
 {
 	position:absolute; 
-	top: 105px; 
+	top: 95px; 
 	text-align: left; 
 	border: 2px solid #ffffff; 
 	height: 490px;
@@ -52,10 +52,10 @@ p a
 .infobar
 {
 	position:absolute; 
-	top: -50px; 
+	top: -60px; 
 	text-align: left; 
 	border: 2px solid #ffffff; 
-	height: 200px;
+	height: 180px;
 	width: 1180px;
 	margin-top: 650px;
 }
@@ -85,7 +85,25 @@ p a
 /* margin-top: 10px ;
  margin-bottom: 10px ;*/
  background-color: white ;
+ width: 120px;
 }
+
+.button_2nd_row {
+ font-family: Helvetica ;
+ font-weight: bold ;
+ padding: 15px; 
+ border: 1px solid black ;
+ -moz-border-radius: 8px ;
+ -webkit-border-radius: 8px ; 
+/* margin-top: 10px ;
+ margin-bottom: 10px ;*/
+ background-color: white ;
+ position: relative;
+ top: -115px;
+ left: 140px;
+ width: 120px;
+}
+
 
 /*.playertotalwealth
 {

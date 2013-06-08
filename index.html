@@ -118,7 +118,7 @@ needs to zoom when touching water (make water svg object?)
 				
 				// document.getElementById('testlink').onclick();
 					
-				alert("Imagine that WWII has come and gone and that the thirst for military domination has gone out of the world. In this post-colonialist world, power is gained through coercion and exploitation. The most fought over thing on the planet, oil, is beginning its gradual depletion, but it is still the largest factor driving the world's economies and armies. \r\rYour mission is to conquer the world. But you may not be able to do it by driving your war machine around the globe. You must use less direct means to conquer countries and fill your coffers.");
+				alert("Imagine that WWII has come and gone and that the thirst for military domination has gone out of the world. In this post-colonialist world, power is gained through coercion and exploitation. The most fought over thing on the planet, oil, is beginning its gradual depletion, but it is still the largest factor driving the world's economies and armies. \r\rYour mission is to conquer the world. But you can no longer do it by driving your war machine around the globe. You must use less direct means to conquer countries and fill your personal coffers.");
 				// this country's abbreviation 
 				
 				// TODO
@@ -247,10 +247,10 @@ needs to zoom when touching water (make water svg object?)
 					}
 				}
 				
-				var supportbutton=document.getElementById("support_button");
+				var corruptbutton=document.getElementById("corrupt_button");
 				sanctionbutton.onclick=function()
 				{
-					selected_action = 'support';
+					selected_action = 'corrupt';
 					// selected_action_value = 4;
 					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
 					{
@@ -362,7 +362,7 @@ needs to zoom when touching water (make water svg object?)
 				<div class="gametitle">GRAND AREA</div>
 				<div class="playername">A game of global hegemony<br><br>
 				</div><br><br>
-				<div style='position:relative; left:10px; top:-50px;'>
+				<div style='position:absolute; left:10px; top:-50px;'>
 					<!-- Current Player is: <span id="playernameid"></span> -->
 					<!-- <span style='position:relative; margin-left:900px; top:-5px;'>
 						<button class='button' style='height:40px;'>END TURN</a>
@@ -404,20 +404,20 @@ needs to zoom when touching water (make water svg object?)
 				</form><br><br> -->
 				
 				
-				<p style='position:relative; top:15px; left:15px;'>
+				<p style='position:absolute; top:15px; left:15px;'>
 					Player: <span id='player'></span><span id='playerspan'></span><br>
 					Target: <span id='target'></span><span id='targetspan'></span><br><br>
 
-					<button class='button' id='invade_button'>INVADE</button><br>
+					<button class='button' id='invade_button' style="position:relative; top:50px">INVADE</button><br>
 					<!-- Strength advantage: <br><span id='strengthadvantage'></span><br> -->
 					
-					<button class='button' id='coup_button'>COUP</button><br>
+					<button class='button' id='coup_button' style="position:relative; top:70px">COUP</button><br>
 					<!-- Wealth advantage: <br><span id='wealthadvantage'></span><br> -->
 					
-					<button class='button' id='sanction_button'>SANCTION</button><br>
+					<button class='button' id='sanction_button' style="position:relative; top:90px">SANCTION</button><br>
 					<!-- Sanction counter: <br><span id='sanctioncounter'>2</span><br> -->
 									
-					<button class='button' id='support_button'>SUPPORT</button><br>
+					<button class='button' id='corrupt_button' style="position:relative; top:110px">CORRUPT</button><br>
 					<!-- Support counter: <br><span id='supportcounter'>2</span><br> -->
 					<!-- show token images? allow drag and drop of tokens onto target country?<br> -->
 				</p>
@@ -425,7 +425,7 @@ needs to zoom when touching water (make water svg object?)
 		
 		
 			<div class="infobar">
-				<div style='position:relative; left:15px; top:7px;'>
+				<div style='position:absolute; left:15px; top:10px;'>
 					US info<br>
 					fuel exports: <br>
 					total wealth: <br>
@@ -435,7 +435,7 @@ needs to zoom when touching water (make water svg object?)
 					<!-- numbers should be from 0 to 100? -->
 					
 				</div>
-				<div style='position:relative; left:300px; top:-100px;'>
+				<div style='position:absolute; left:300px; top:10px;'>
 					Current target's info<br>
 					fuel exports: <br>
 					total wealth: <br>
@@ -443,19 +443,19 @@ needs to zoom when touching water (make water svg object?)
 					human development: <br>
 					armed forces: <br>
 					sanction status: <br>
-					support status: <br>
+					corrupt status: <br>
 
 					<!-- show list of all countries sanctioning or supporting this country?
 					show an index of the amount that it is sanctioned or supported? -->
 
 				</div>
-				<div style='position:relative; left:650px; top:-250px;'>
+				<div style='position:absolute; left:650px; top:10px;'>
 					Highlight all countries by index<br>
 					<button id='totalwealth' class='button'>total wealth</button><br>
 					<button id='familywealth' class='button'>family wealth</button><br>
-					<button id='humandevelopment' class='button' style="position:relative; left:50px;">human development</button><br>
-					<button id='armedforces' class='button' style="position:relative; top:-150px; left:150px;">armed forces</button><br>
-					<button id='fuelexports' class='button' style="position:relative; top:-150px; left:150px;">fuel exports</button><br>
+					<button id='humandevelopment' class='button' style="position:absolute; left:50px; width:150px">human development</button><br>
+					<button id='armedforces' class='button_2nd_row'>armed forces</button><br>
+					<button id='fuelexports' class='button_2nd_row'>fuel exports</button><br>
 					
 					<!-- <form name='sortcountries' style='position:absolute; top:0px; left:335px;'>
 						View countries by index:<br>

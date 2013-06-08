@@ -345,8 +345,8 @@ RaphaelZPD = function(raphaelPaper, o) {
 		
 		var p = me.getEventPoint(evt);
 	
-		p.x -= 320;
-		p.y -= 120;
+		p.x -= 330;
+		p.y -= 130;
 
 		p = p.matrixTransform(g.getCTM().inverse());
 		
