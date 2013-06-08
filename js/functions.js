@@ -30,8 +30,6 @@ function exploit(player,target)
 	// update the sanction effect on sanctioned countries
 	
 	
-	
-
 }
 
 function sanction(player,target)
@@ -79,17 +77,20 @@ function lon2x(lon)
 {
 	// int x =  (int) ((MAP_WIDTH/360.0) * (180 + lon));
 	
-	// var xfactor = 2.6938;
-	// var xoffset = 465.4;
+	var xfactor = 2.6938;
+	var xoffset = 465.4;
 	
 	// var xfactor = -1;
 	// var xoffset = 490;
 	
-	// var xfactor = -2;
-	// var xoffset = 300;
+	// var xfactor = 2.97;
+	// var xoffset = 490;
 	
-	// var x = (lon * xfactor) + xoffset;
-	var x = 490 - ((980/360.0) * (180 + lon));
+	var x = (lon * xfactor) + xoffset;
+	// var x = ((980/360.0) * (180 + lon));
+	
+	// var x = 250;
+	
 	return x;
 }
 
@@ -97,17 +98,19 @@ function lat2y(lat)
 {
 	// int y =  (int) ((MAP_HEIGHT/180.0) * (90 - lat));
 	
-	// var yfactor = -2.6938;
-	// var yoffset = 227.066;
+	var yfactor = -2.6938;
+	var yoffset = 227.066;
 	
 	// var yfactor = 1;
 	// var yoffset = 250;
+		
+	// var yfactor = -2.78;
+	// var yoffset = 250;
 	
-	// var yfactor = 4;
-	// var yoffset = 465;
+	// var y = (((lat+90)*500)/180);
 	
-	// var y = (lat * yfactor) + yoffset;
-	var y = 250 - ((500/180.0) * (90 - lat));
+	var y = (lat * yfactor) + yoffset;
+	// var y = ((500/180.0) * (90 - lat));
 	return y;
 }
 
@@ -238,30 +241,46 @@ function showAction(player, target, selectedActionValue, place, type)
 			
 			if (short_name[counter] == target)
 			{
+				console.log("target (end): " + target);
+				
 				// endy = lat2y(lat_y[counter]);
 				// endx = lon2x(lon_x[counter]);
 
-				// endy = lat2y(data[short_name[counter]]["city_y"]);
-				// endx = lon2x(data[short_name[counter]]["city_x"]);
+				endx = lon2x(data[short_name[counter]]["city_y"]);
+				endy = lat2y(data[short_name[counter]]["city_x"]);
 				
-				endy = -47.55;
-				endx = -15.47;
+				// endx = 490;
+				// endy = 300;
 				
-				endy = lat2y(-47.55);
-				endx = lon2x(-15.47);
+				console.log("end lon: " + data[short_name[counter]]["city_y"]);
+				console.log("end lat: " + data[short_name[counter]]["city_x"]);
 				
+				console.log("end x: " + endx);
+				console.log("end y: " + endy);
+				
+				console.log("---");
 			}
 		
 			if (short_name[counter] == player)
 			{
+				console.log("player (start): " + player)
+				
 				// starty = lat2y(lat_y[counter]);
 				// startx = lon2x(lon_x[counter]);
 				
-				// starty = lat2y(data[short_name[counter]]["city_y"]);
-				// startx = lon2x(data[short_name[counter]]["city_x"]);
+				startx = lon2x(data[short_name[counter]]["city_y"]);
+				starty = lat2y(data[short_name[counter]]["city_x"]);
 				
-				starty = 250;
-				startx = 490;
+				// startx = 0;
+				// starty = 0;
+								
+				console.log("start lon: " + data[short_name[counter]]["city_y"]);
+				console.log("start lat: " + data[short_name[counter]]["city_x"]);
+				
+				console.log("start x: " + startx);
+				console.log("start y: " + starty);
+
+				console.log("---");
 			}
 		}
 	
@@ -317,8 +336,11 @@ function showAction(player, target, selectedActionValue, place, type)
 			
 			arrowLength = Math.sqrt(xdif*xdif+ydif*ydif)/700;
 			document.getElementById('arrowlength').innerHTML = arrowLength;
-			// console.log("start x: " + startx);
-			// console.log("end x: " + endx);
+			console.log("---");
+			console.log("start x: " + startx);
+			console.log("start y: " + starty);
+			console.log("end x: " + endx);
+			console.log("end y: " + endy);
 			// console.log("new x 1: " + newx1);
 			attackPath[place] = R.path("M"+startx+" "+starty+" L"+endx+" "+endy+" L"+(endx+newx1)+" "+(endy+newy1)+" L"+(endx+newx2)+" "+(endy+newy2)+" L"+endx+" "+endy).attr({stroke: linecolor});
 		} 
