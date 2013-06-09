@@ -209,7 +209,7 @@ needs to zoom when touching water (make water svg object?)
 				var invadebutton=document.getElementById("invade_button");
 				invadebutton.onclick=function()
 				{
-					invade(player,target,playerCountryNumber,targetCountryNumber);
+					invade(target);
 					
 					// selected_action = 'invade';
 					// doAction(selected_action);
@@ -228,7 +228,7 @@ needs to zoom when touching water (make water svg object?)
 				var coupbutton=document.getElementById("coup_button");
 				coupbutton.onclick=function()
 				{
-					coup(player,target,targetCountryNumber)
+					coup(target)
 					
 					// selected_action = 'coup';
 					// doAction(selected_action);
@@ -247,7 +247,7 @@ needs to zoom when touching water (make water svg object?)
 				var sanctionbutton=document.getElementById("sanction_button");
 				sanctionbutton.onclick=function()
 				{
-					sanction(player,target);
+					sanction(target);
 					
 					// selected_action = 'sanction';
 					// doAction(selected_action);
@@ -266,7 +266,7 @@ needs to zoom when touching water (make water svg object?)
 				var corruptbutton=document.getElementById("corrupt_button");
 				sanctionbutton.onclick=function()
 				{
-					corrupt(player,target,playerCountryNumber,targetCountryNumber)
+					corrupt(target)
 					
 					// selected_action = 'corrupt';
 					// doAction(selected_action);

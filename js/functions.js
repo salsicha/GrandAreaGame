@@ -41,7 +41,7 @@ function fireEvent(element,event)
 	// update the sanction effect on sanctioned countries
 // }
 
-function invade(player,target,playerCountryNumber,targetCountryNumber)
+function invade(target)
 {	
 	// Invasion means Total_Wealth loss (or the attacker) proportional to difference in Armed_Forces. the target is exploited but left in ruins. the attackers wealth inequality goes up.
 	
@@ -54,7 +54,7 @@ function invade(player,target,playerCountryNumber,targetCountryNumber)
 	alert("Your great army rolls across the land. At great cost to the people of your nation you can conquer a weaker foe, but the spoils of war are yours alone to keep.\r\rTotal wealth of your nation is reduced in proportion to the difference in armed forces of the two sides. Your wealth inequalty goes up. The conquered nation's total wealth and human development go down dramatically.")
 }
 
-function coup(player,target,targetCountryNumber)
+function coup(target)
 {	
 	// Coup means loss (in the target country) of total wealth and human development, the target has a %50/%50 chance of being exploited or turning against the aggressor.
 	
@@ -65,7 +65,7 @@ function coup(player,target,targetCountryNumber)
 	alert("Marionettes dance the charade of the maipulator.\r\rTotal wealth and human development in the target country are both devastated. The target country is just as likely to let you exploit them as they are to label you 'The Devil'.")
 }
 
-function sanction(player,target)
+function sanction(target)
 {	
 	// Sanctioning reduces the political cost of invading, the target's total wealth and wealth inequality increases.
 	
@@ -77,7 +77,7 @@ function sanction(player,target)
 	alert("Capital turns its back on the targeted country. The price of imports interest rates both skyrocket.\r\rThe target's total wealth and armed forces decrease, and it's wealth inequality increases.");
 }
 
-function corrupt(player,target,playerCountryNumber,targetCountryNumber)
+function corrupt(target)
 {
 
 	// update data
