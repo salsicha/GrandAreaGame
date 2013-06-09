@@ -1,11 +1,22 @@
-/////
+function doAction(selected_action)
+{
+	// selected_action = 'invade';
+	// selected_action_value = 1;
+	// if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
+	// {
+	// 	document.getElementById('target').innerHTML = '';
+	// 	document.getElementById('targetspan').innerHTML = '';
+	// } else
+	// {
+	// 	showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
+	// }
+}
 
 function BlockMove(event)
 {
 	// Tell Safari not to move the window.
 	event.preventDefault() ;
 }
-
 
 function fireEvent(element,event)
 {
@@ -61,7 +72,7 @@ function coup(player,target,targetCountryNumber)
 	
 }
 
-function support(player,target,playerCountryNumber,targetCountryNumber)
+function corrupt(player,target,playerCountryNumber,targetCountryNumber)
 {
 	// add action to action array
 	// update data
@@ -202,7 +213,7 @@ function clearMap()
 	}				
 }
 
-function showAction(player, target, place, type)
+function showAction(player, target, place)
 {
 	var startx = 0;
 	var starty = 0;
@@ -245,8 +256,8 @@ function showAction(player, target, place, type)
 			}
 		} 
 		
-		if (type == "invade" || type == "sanction" || type == "coup" || type == "exploit" || type == "support")
-		{
+		// if (type == "invade" || type == "sanction" || type == "coup" || type == "exploit" || type == "support")
+		// {
 			var xdif = startx - endx;
 			var ydif = starty - endy;
 			
@@ -258,35 +269,37 @@ function showAction(player, target, place, type)
 			var newy1 = size*Math.sin(angle+2.5);
 			var newy2 = size*Math.sin(angle-2.5);
 			
-			var linecolor = "#ff0000";
+			// var linecolor = "#ff0000";
+			// 
+			// if (type == "invade")
+			// {
+			// 	linecolor = "#ff0000";
+			// }
+			// else if (type == "coup")
+			// {
+			// 	linecolor = "#ffa000";
+			// }
+			// else if (type == "exploit")
+			// {
+			// 	linecolor = "#00ff00";
+			// } 
+			// else if (type == "sanction")
+			// {
+			// 	linecolor = "#ffff00";
+			// }
+			// else if (type == "support")
+			// {
+			// 	linecolor = "#ffffff";
+			// }
 			
-			if (type == "invade")
-			{
-				linecolor = "#ff0000";
-			}
-			else if (type == "coup")
-			{
-				linecolor = "#ffa000";
-			}
-			else if (type == "exploit")
-			{
-				linecolor = "#00ff00";
-			} 
-			else if (type == "sanction")
-			{
-				linecolor = "#ffff00";
-			}
-			else if (type == "support")
-			{
-				linecolor = "#ffffff";
-			}
+			linecolor = "#ff0000";
 			
 			arrowLength = Math.sqrt(xdif*xdif+ydif*ydif)/700;
 			arrowLength = arrowLength.toFixed(5);
 			// document.getElementById('arrowlength').innerHTML = arrowLength;
 
 			attackPath[place] = R.path("M"+startx+" "+starty+" L"+endx+" "+endy+" L"+(endx+newx1)+" "+(endy+newy1)+" L"+(endx+newx2)+" "+(endy+newy2)+" L"+endx+" "+endy).attr({stroke: linecolor});
-		} 
+		// } 
 	}
 }
 

@@ -75,7 +75,7 @@ p a
 	text-align:center;
 }
 
-.button {
+button {
  font-family: Helvetica ;
  font-weight: bold ;
  padding: 15px; 
@@ -86,6 +86,22 @@ p a
  margin-bottom: 10px ;*/
  background-color: white ;
  width: 120px;
+ position: relative;
+}
+
+.button_bottom {
+ font-family: Helvetica ;
+ font-weight: bold ;
+ padding: 15px; 
+ border: 1px solid black ;
+ -moz-border-radius: 8px ;
+ -webkit-border-radius: 8px ; 
+/* margin-top: 10px ;
+ margin-bottom: 10px ;*/
+ background-color: white ;
+ width: 140px;
+ position: relative;
+ left: -40px;
 }
 
 .button_2nd_row {
@@ -101,7 +117,7 @@ p a
  position: relative;
  top: -115px;
  left: 140px;
- width: 120px;
+ width: 140px;
 }
 
 

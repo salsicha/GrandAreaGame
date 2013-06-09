@@ -1,6 +1,4 @@
-﻿
-<!-- 
-
+﻿<!-- 
 TODO
 End Turn button should switch players
 Sanction and Support buttons should be drag-n-droppable tokens with number indicator
@@ -64,6 +62,7 @@ needs to zoom when touching water (make water svg object?)
 			var armed_forces = new Array();
 			var fuel_exports = new Array();
 			var family_wealth = new Array();
+			var wealth_inequality = new Array();
 			var city_name = new Array();
 			// var in_use = new Array();
 			var lat_y = new Array();
@@ -205,61 +204,77 @@ needs to zoom when touching water (make water svg object?)
 				var invadebutton=document.getElementById("invade_button");
 				invadebutton.onclick=function()
 				{
-					selected_action = 'invade';
+					invade(player,target,playerCountryNumber,targetCountryNumber);
+					
+					// selected_action = 'invade';
+					// doAction(selected_action);
+					
 					// selected_action_value = 1;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
-					{
-						document.getElementById('target').innerHTML = '';
-						document.getElementById('targetspan').innerHTML = '';
-					} else
-					{
-						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
-					}
+					// if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
+					// {
+					// 	document.getElementById('target').innerHTML = '';
+					// 	document.getElementById('targetspan').innerHTML = '';
+					// } else
+					// {
+					// 	showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
+					// }
 				}
 
 				var coupbutton=document.getElementById("coup_button");
 				coupbutton.onclick=function()
 				{
-					selected_action = 'coup';
+					coup(player,target,targetCountryNumber)
+					
+					// selected_action = 'coup';
+					// doAction(selected_action);
+					
 					// selected_action_value = 2;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
-					{
-						document.getElementById('target').innerHTML = '';
-						document.getElementById('targetspan').innerHTML = '';
-					} else
-					{
-						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
-					}
+					// if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
+					// {
+					// 	document.getElementById('target').innerHTML = '';
+					// 	document.getElementById('targetspan').innerHTML = '';
+					// } else
+					// {
+					// 	showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
+					// }
 				}
 				
 				var sanctionbutton=document.getElementById("sanction_button");
 				sanctionbutton.onclick=function()
 				{
-					selected_action = 'sanction';
+					sanction(player,target);
+					
+					// selected_action = 'sanction';
+					// doAction(selected_action);
+					
 					// selected_action_value = 3;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
-					{
-						document.getElementById('target').innerHTML = '';
-						document.getElementById('targetspan').innerHTML = '';
-					} else
-					{
-						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
-					}
+					// if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
+					// {
+					// 	document.getElementById('target').innerHTML = '';
+					// 	document.getElementById('targetspan').innerHTML = '';
+					// } else
+					// {
+					// 	showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
+					// }
 				}
 				
 				var corruptbutton=document.getElementById("corrupt_button");
 				sanctionbutton.onclick=function()
 				{
-					selected_action = 'corrupt';
+					corrupt(player,target,playerCountryNumber,targetCountryNumber)
+					
+					// selected_action = 'corrupt';
+					// doAction(selected_action);
+					
 					// selected_action_value = 4;
-					if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
-					{
-						document.getElementById('target').innerHTML = '';
-						document.getElementById('targetspan').innerHTML = '';
-					} else
-					{
-						showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
-					}
+					// if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
+					// {
+					// 	document.getElementById('target').innerHTML = '';
+					// 	document.getElementById('targetspan').innerHTML = '';
+					// } else
+					// {
+					// 	showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
+					// }
 				}
 				
 				var wealth_highlight_button = document.getElementById("totalwealth");
@@ -268,10 +283,16 @@ needs to zoom when touching water (make water svg object?)
 					updateMap("total_wealth");
 				}
 				
-				var family_wealth_highlight_button = document.getElementById("familywealth");
-				family_wealth_highlight_button.onclick = function()
+				// var family_wealth_highlight_button = document.getElementById("familywealth");
+				// family_wealth_highlight_button.onclick = function()
+				// {
+				// 	updateMap("family_wealth");
+				// }
+				
+				var wealth_inequality_highlight_button = document.getElementById("wealthinequality");
+				wealth_inequality_highlight_button.onclick = function()
 				{
-					updateMap("family_wealth");
+					updateMap("gini_index");
 				}
 				
 				var human_development_highlight_button = document.getElementById("humandevelopment");
@@ -340,7 +361,7 @@ needs to zoom when touching water (make water svg object?)
 								ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
 							// }
 							// showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, document.getElementById('actions').options[document.getElementById('actions').selectedIndex].value, 0, chosenoptionSelected);
-							showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
+							showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0);
 						};
 					})(worldmap[state], state);
 				}
@@ -427,23 +448,23 @@ needs to zoom when touching water (make water svg object?)
 			<div class="infobar">
 				<div style='position:absolute; left:15px; top:10px;'>
 					US info<br>
-					fuel exports: <br>
-					total wealth: <br>
-					family wealth: <br>
-					human development: <br>
-					armed forces: <br>
+					fuel exports: <span id='usfuelexports'></span><br>
+					total wealth: <span id='ustotalwealth'></span><br>
+					wealth inequality: <span id='uswealthinequality'></span><br>
+					human development: <span id='ushumandevelopment'></span><br>
+					armed forces: <span id='usarmedforces'></span><br>
 					<!-- numbers should be from 0 to 100? -->
 					
 				</div>
 				<div style='position:absolute; left:300px; top:10px;'>
 					Current target's info<br>
-					fuel exports: <br>
-					total wealth: <br>
-					family wealth: <br>
-					human development: <br>
-					armed forces: <br>
-					sanction status: <br>
-					corrupt status: <br>
+					fuel exports: <span id='targetfuelexports'></span><br>
+					total wealth: <span id='targettotalwealth'></span><br>
+					wealth inequality: <span id='targetwealthinequality'></span><br>
+					human development: <span id='targethumandevelopment'></span><br>
+					armed forces: <span id='targetarmedforces'></span><br>
+					<!-- sanction status: <br>
+					corrupt status: <br> -->
 
 					<!-- show list of all countries sanctioning or supporting this country?
 					show an index of the amount that it is sanctioned or supported? -->
@@ -451,9 +472,9 @@ needs to zoom when touching water (make water svg object?)
 				</div>
 				<div style='position:absolute; left:650px; top:10px;'>
 					Highlight all countries by index<br>
-					<button id='totalwealth' class='button'>total wealth</button><br>
-					<button id='familywealth' class='button'>family wealth</button><br>
-					<button id='humandevelopment' class='button' style="position:absolute; left:50px; width:150px">human development</button><br>
+					<button id='totalwealth' class='button_bottom'>total wealth</button><br>
+					<button id='wealthinequality' class='button_bottom'>wealth inequality</button><br>
+					<button id='humandevelopment' class='button_bottom' style="position:absolute; left:40px; width:150px">human development</button><br>
 					<button id='armedforces' class='button_2nd_row'>armed forces</button><br>
 					<button id='fuelexports' class='button_2nd_row'>fuel exports</button><br>
 					
@@ -496,11 +517,3 @@ needs to zoom when touching water (make water svg object?)
 		</div>
 	</body>
 </html>
-
-
-
-
-
-
-
-
