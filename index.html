@@ -126,11 +126,7 @@ needs to zoom when touching water (make water svg object?)
 				// set playingcountry here:
 				playingcountry = short_name[playerNumber];
 				
-				document.getElementById('usfuelexports').innerHTML = data["US"]["fuel_exports"];
-				document.getElementById('ustotalwealth').innerHTML = data["US"]["total_wealth"];
-				document.getElementById('uswealthinequality').innerHTML = data["US"]["gini_index"];
-				document.getElementById('ushumandevelopment').innerHTML = data["US"]["human_development"];
-				document.getElementById('usarmedforces').innerHTML = data["US"]["armed_forces"];
+				showPlayerInfo();
 
 				// lockCountry(playingcountry);
 				
@@ -276,7 +272,7 @@ needs to zoom when touching water (make water svg object?)
 				}
 				
 				var corruptbutton=document.getElementById("corrupt_button");
-				sanctionbutton.onclick=function()
+				corruptbutton.onclick=function()
 				{
 					var target = document.getElementById('targetspan').innerHTML;
 					
@@ -378,12 +374,8 @@ needs to zoom when touching water (make water svg object?)
 								var ajaxDisplayTargetSpan = document.getElementById('targetspan');
 								ajaxDisplayTargetSpan.innerHTML = state;
 								
-								document.getElementById('targetfuelexports').innerHTML = data[state]["fuel_exports"];
-								document.getElementById('targettotalwealth').innerHTML = data[state]["total_wealth"];
-								document.getElementById('targetwealthinequality').innerHTML = data[state]["gini_index"];
-								document.getElementById('targethumandevelopment').innerHTML = data[state]["human_development"];
-								document.getElementById('targetarmedforces').innerHTML = data[state]["armed_forces"];
-							
+								showTargetInfo(state);
+															
 								// var ajaxDisplayTarget = document.getElementById('target');
 								// ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
 							// }

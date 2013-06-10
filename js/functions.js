@@ -1,5 +1,5 @@
-function doAction(selected_action)
-{
+// function doAction(selected_action)
+// {
 	// selected_action = 'invade';
 	// selected_action_value = 1;
 	// if (document.getElementById('targetspan').innerHTML == document.getElementById('playerspan').innerHTML)
@@ -10,6 +10,24 @@ function doAction(selected_action)
 	// {
 	// 	showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0, selected_action);
 	// }
+// }
+
+function showPlayerInfo()
+{
+	document.getElementById('usfuelexports').innerHTML = data["US"]["fuel_exports"];
+	document.getElementById('ustotalwealth').innerHTML = data["US"]["total_wealth"];
+	document.getElementById('uswealthinequality').innerHTML = data["US"]["gini_index"];
+	document.getElementById('ushumandevelopment').innerHTML = data["US"]["human_development"];
+	document.getElementById('usarmedforces').innerHTML = data["US"]["armed_forces"];
+}
+
+function showTargetInfo(state)
+{
+	document.getElementById('targetfuelexports').innerHTML = data[state]["fuel_exports"];
+	document.getElementById('targettotalwealth').innerHTML = data[state]["total_wealth"];
+	document.getElementById('targetwealthinequality').innerHTML = data[state]["gini_index"];
+	document.getElementById('targethumandevelopment').innerHTML = data[state]["human_development"];
+	document.getElementById('targetarmedforces').innerHTML = data[state]["armed_forces"];
 }
 
 function BlockMove(event)
@@ -50,25 +68,59 @@ function invade(target)
 	// show invasion animation
 	// if successfull, call exploit
 	
-	// update data
+	// update data	
+	if(data["US"]["armed_forces"] > data[target]["armed_forces"])
+	{
+		alert("Your great army rolls across the land. At great cost to the people of your nation you conquer a weaker foe, but the spoils of war are yours alone to keep.\r\rTotal wealth of your nation is reduced in proportion to the difference in armed forces of the two sides. Your wealth inequalty goes up. The conquered nation's total wealth and human development go down dramatically.")
+		
+		data["US"]["total_wealth"] -= data["US"]["armed_forces"] - data[target]["armed_forces"];
+		data["US"]["gini_index"] += 0.1;
+		data[target]["total_wealth"] -= 0.1;
+		data[target]["human_development"] -= 0.1;
+		
+		if(data["US"]["gini_index"] >= 1.0)
+		{
+			alert("Congradulations, you have achieved perfect inequality. You toast your last glass of champaign as the impovrished hoardes come for your heads.\r\rGAME OVER")
+		}
+		
+		if(data["US"]["total_wealth"] <= 0.5)
+		{
+			alert("Congradulations, you have impoverished your home land to the point that it is no longer a global super power. You are still in charge, but stories of your mis-management will live forever.\r\rGAME OVER")
+		}
+	} else
+	{
+		alert("There army is too great, you cannot defeat them.");
+	}
 	
-	alert("Your great army rolls across the land. At great cost to the people of your nation you can conquer a weaker foe, but the spoils of war are yours alone to keep.\r\rTotal wealth of your nation is reduced in proportion to the difference in armed forces of the two sides. Your wealth inequalty goes up. The conquered nation's total wealth and human development go down dramatically.")
+	// update map
+	showPlayerInfo();
+	showTargetInfo(target);
+	clearMap();
 }
 
 function coup(target)
 {	
+	alert("Marionettes dance to the charade of the maipulator.\r\rTotal wealth and human development in the target country are both devastated. The target country is just as likely to let you exploit them as they are to label you 'The Devil'.")
+	
 	// Coup means loss (in the target country) of total wealth and human development, the target has a %50/%50 chance of being exploited or turning against the aggressor.
 	
 	// compare family wealth
 	// if successful, apply exploit
 	
 	// update data
+	data[target]["total_wealth"] -= 0.1;
+	data[target]["human_development"] -= 0.1;
 	
-	alert("Marionettes dance the charade of the maipulator.\r\rTotal wealth and human development in the target country are both devastated. The target country is just as likely to let you exploit them as they are to label you 'The Devil'.")
+	// update map
+	showPlayerInfo();
+	showTargetInfo(target);
+	clearMap();
 }
 
 function sanction(target)
 {	
+	alert("Capital turns its back on the targeted country. The price of imports interest rates both skyrocket.\r\rThe target's total wealth and armed forces decrease, and it's wealth inequality increases.");
+	
 	// Sanctioning reduces the political cost of invading, the target's total wealth and wealth inequality increases.
 	
 	// check to see if target can be sanctioned
@@ -77,16 +129,29 @@ function sanction(target)
 	// if country crumbles, apply exploit
 	
 	// update data
-
-	alert("Capital turns its back on the targeted country. The price of imports interest rates both skyrocket.\r\rThe target's total wealth and armed forces decrease, and it's wealth inequality increases.");
+	data[target]["total_wealth"] -= 0.1;
+	data[target]["armed_forces"] -= 0.1;
+	data[target]["gini_index"] += 0.1;
+	
+	// update map
+	showPlayerInfo();
+	showTargetInfo(target);
+	clearMap();
 }
 
 function corrupt(target)
 {
-
-	// update data
-	
 	alert("Neo-liberal doctrines become law. The most poor are taxed to the breaking point and the money is delivered to US banks.\r\rYour nation's total wealth increases. The target's total wealth decreases, and their wealth inequality increases.")
+	
+	// update data
+	data["US"]["total_wealth"] += 0.1;
+	data[target]["total_wealth"] -= 0.1;
+	data[target]["gini_index"] += 0.1;
+	
+	// update map
+	showPlayerInfo();
+	showTargetInfo(target);
+	clearMap();
 }
 
 
