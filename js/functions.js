@@ -49,6 +49,7 @@ function invade(target)
 	// compare relative strengths
 	// show invasion animation
 	// if successfull, call exploit
+	
 	// update data
 	
 	alert("Your great army rolls across the land. At great cost to the people of your nation you can conquer a weaker foe, but the spoils of war are yours alone to keep.\r\rTotal wealth of your nation is reduced in proportion to the difference in armed forces of the two sides. Your wealth inequalty goes up. The conquered nation's total wealth and human development go down dramatically.")
@@ -60,6 +61,7 @@ function coup(target)
 	
 	// compare family wealth
 	// if successful, apply exploit
+	
 	// update data
 	
 	alert("Marionettes dance the charade of the maipulator.\r\rTotal wealth and human development in the target country are both devastated. The target country is just as likely to let you exploit them as they are to label you 'The Devil'.")
@@ -73,6 +75,8 @@ function sanction(target)
 	// add sanction action
 	// check sanction strength
 	// if country crumbles, apply exploit
+	
+	// update data
 
 	alert("Capital turns its back on the targeted country. The price of imports interest rates both skyrocket.\r\rThe target's total wealth and armed forces decrease, and it's wealth inequality increases.");
 }

@@ -209,8 +209,12 @@ needs to zoom when touching water (make water svg object?)
 				var invadebutton=document.getElementById("invade_button");
 				invadebutton.onclick=function()
 				{
-					invade(target);
+					var target = document.getElementById('targetspan').innerHTML;
 					
+					if(target != '')
+					{
+						invade(target);
+					}
 					// selected_action = 'invade';
 					// doAction(selected_action);
 					
@@ -228,8 +232,12 @@ needs to zoom when touching water (make water svg object?)
 				var coupbutton=document.getElementById("coup_button");
 				coupbutton.onclick=function()
 				{
-					coup(target)
+					var target = document.getElementById('targetspan').innerHTML;
 					
+					if(target != '')
+					{
+						coup(target)
+					}
 					// selected_action = 'coup';
 					// doAction(selected_action);
 					
@@ -247,8 +255,12 @@ needs to zoom when touching water (make water svg object?)
 				var sanctionbutton=document.getElementById("sanction_button");
 				sanctionbutton.onclick=function()
 				{
-					sanction(target);
+					var target = document.getElementById('targetspan').innerHTML;
 					
+					if(target != '')
+					{
+						sanction(target);
+					}
 					// selected_action = 'sanction';
 					// doAction(selected_action);
 					
@@ -266,8 +278,12 @@ needs to zoom when touching water (make water svg object?)
 				var corruptbutton=document.getElementById("corrupt_button");
 				sanctionbutton.onclick=function()
 				{
-					corrupt(target)
+					var target = document.getElementById('targetspan').innerHTML;
 					
+					if(target != '')
+					{
+						corrupt(target)
+					}
 					// selected_action = 'corrupt';
 					// doAction(selected_action);
 					
@@ -359,7 +375,7 @@ needs to zoom when touching water (make water svg object?)
 							// var chosenoptionSelected = document.getElementById("actions").options[document.getElementById("actions").selectedIndex].value;
 							// if (chosenoptionSelected != 'skim' && chosenoptionSelected != 'protect')
 							// {
-								var ajaxDisplayTargetSpan = document.getElementById('targetspan');							
+								var ajaxDisplayTargetSpan = document.getElementById('targetspan');
 								ajaxDisplayTargetSpan.innerHTML = state;
 								
 								document.getElementById('targetfuelexports').innerHTML = data[state]["fuel_exports"];
@@ -368,8 +384,8 @@ needs to zoom when touching water (make water svg object?)
 								document.getElementById('targethumandevelopment').innerHTML = data[state]["human_development"];
 								document.getElementById('targetarmedforces').innerHTML = data[state]["armed_forces"];
 							
-								var ajaxDisplayTarget = document.getElementById('target');							
-								ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
+								// var ajaxDisplayTarget = document.getElementById('target');
+								// ajaxDisplayTarget.innerHTML = "<input type='hidden' value='" + state + "' />";
 							// }
 							// showAction(document.getElementById('playernameid').innerHTML, document.getElementById('targetspan').innerHTML, document.getElementById('actions').options[document.getElementById('actions').selectedIndex].value, 0, chosenoptionSelected);
 							showAction(document.getElementById('playerspan').innerHTML, document.getElementById('targetspan').innerHTML, 0);
