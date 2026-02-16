@@ -62,3 +62,14 @@ Your "Country" has a population that doesn't know they are being run by a Mafia.
 If a client country's family decides to use their Country Wealth to feed their people instead of paying the controlling Family, they have committed the ultimate sin: Defiance. * Result: The controlling Family must "make an example" of them. If they don't, other families will stop paying tribute.
 
 If a client country's family decides leave the global system. The controlling Family must "make an example" of them. If they don't, other families will stop paying tribute.
+
+In this game, you don't just "do" things; you "frame" them:
+...
+
+The "Debt Shakedown" (IMF/World Bank Mechanic)
+...
+
+The regional families are trying to become the head family, the client families are trying to become regional or to break the system by becoming independant. The system only allows resource poor states to be independant
+
+
+
