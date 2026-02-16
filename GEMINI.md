@@ -3,31 +3,6 @@ The objective is to make a game for boardgamearena, using javascript on hte fron
 
 The game will feature a map of the world, similar to Risk.
 
+You can play any country, they all have their own regional issues
 
-1. Benevolent Cover (The PR Shield)
-The Action: You frame a military intervention or a corporate resource grab as a "Crusade for Democracy" or "Humanitarian Aid."
-
-The Benefit: Reduces "Domestic Dissent" and prevents the "International Pariah" status. It allows you to keep tax-paying citizens supportive of the defense budget.
-
-The Complication: "The Credibility Gap." If the intervention lasts too long or the "Strong Regime" you installed commits a massacre that leaks to the press (e.g., the My Lai massacre or the El Mozote massacre), your Benevolent Cover shatters. This triggers a Mass Protest Event, temporarily freezing your ability to send military aid.
-
-2. Direct Intervention (The Iron Fist)
-The Action: You bypass subversion and send in the Marines, or launch "Secret Bombing" campaigns (as in Laos).
-
-The Benefit: High success rate. It immediately resets the "Independent Development" meter of a target country to zero, effectively "killing the rot."
-
-The Complication: "The Soviet Pivot." Chomsky notes that when you unleash terror, the victims have "nowhere else to turn." Direct intervention drastically increases the chance that the target country becomes a Soviet Client. You "win" the battle by destroying their schools and hospitals, but you "lose" the territory to your rival's sphere of influence, forcing a long-term, expensive military standoff.
-
-3. Capital Flight (The Economic Noose)
-The Action: You organize an international boycott, freeze the target country's bank accounts, and withdraw all private investment.
-
-The Benefit: Destroys the target government’s ability to provide for its people without firing a single shot. It makes the "Communist" (populist) government look incompetent.
-
-The Complication: "The Black Market Leak." Prolonged economic warfare creates a power vacuum. Organized crime or rival factions (like the China player) may move in to provide "Alternative Credit." Furthermore, if you crash a large enough economy (like Brazil), you risk a Global Recession, which lowers your own "Wealth Disparity" score by hurting your own corporations’ quarterly profits.
-
-4. The Fifth Freedom (The Freedom to Rob)
-The Action: You install a "National Security State"—a military dictatorship that guarantees foreign firms can repatriate 100% of profits.
-
-The Benefit: Maximum "Investment Climate" score. Your wealth generation spikes as you extract raw materials at sub-market costs.
-
-The Complication: "The Refugee Surge." By destroying the "human rights climate" and the "living standards" of the local population to ensure the freedom to rob, you make the country unlivable. This generates a Migration Wave toward your own borders. In-game, this increases "Internal Xenophobia" and "Political Polarization" in the U.S. faction, making it harder to pass unified Grand Area policies.
+In this game, titled "The Fifth Freedom: The Mafia Principle," you play as the "Godfather" of a nation. Your goal is to maximize your Family Income while keeping your "vessel" (the country) functional enough to prevent a revolution.The game is won when your Family reaches an "Untouchable" Net Value, or when you successfully overthrow the Head Family to become the new global Don.1. The Playable EntitiesYou can select any nation, but your starting position dictates your strategy:The Head Family (USA): High Armies and National Income, but high "Heat." Every move is watched by everyone.The Challenger Families (China/Russia): High Resources or Armies, but lower National Income. You win by "poaching" client families from the Don.The Sub-Imperial Families (Brazil/Saudi Arabia/India): High Resources. You win by playing the Superpowers against each other to increase your own Family Income.The "Rot" Countries (Nicaragua/Vietnam/Laos): Low stats, but high National Happiness potential. Your goal is survival and "Independent Development."2. The Core Mechanics: Actions & TradeoffsEvery action moves wealth from the Public (National) to the Private (Family) ledger, but triggers a consequence.ActionCost/RequirementBenefitThe Tradeoff (The "Catch")SkimLowers HappinessConverts National Income to Family Income.Brain Drain: High Skimming reduces Education and Development over time as the "best" citizens flee.ExploitRequires a Coup or Invade firstMassive boost to Family Income via foreign Resources.The Blowback: Increases Refugee counts in your home country, lowering domestic Happiness.InvadeHuge National Income costResets a defiant country's Development and Education to zero.The Quagmire: Ties up your Armies for 5-10 turns, making you vulnerable to Coups at home.SanctionGlobal InfluenceCrashes a rival's National Income.Market Contagion: Lowers your own National Income as trade routes are severed.CoupHigh Family Income costInstalls a "Client Family" (Puppet) in a target country.Instability: Puppet families are weak. You must constantly spend to "Protect" them or they will be overthrown.ProtectArmy deploymentGenerates a "Protection Fee" (Tribute) from a smaller family.The Dependency Trap: The protected family stops investing in their own Armies, making them a permanent financial drain on you.3. The "Indices" DynamicsThese numbers are constantly shifting based on your "management" style:The Education/Dissent Link: If you increase Education (to boost National Income), your Skim action becomes much more dangerous. Educated populations detect corruption faster, leading to a "Revolution Risk" multiplier.The Army/Debt Link: Maintaining a massive Army protects your Family Income abroad, but the upkeep eventually bankrupts your National Income, leading to "Imperial Overstretch."4. Game Phases & WinningThe game progresses through three distinct cycles:The Accumulation Phase: Skim your own nation to build a "War Chest" of Family Income.The Expansion Phase: Use that money to fund Coups and Exploit foreign resources to keep your domestic Happiness artificially high (via "Bread and Circuses").The End Game: * The Hegemon Win: The Head Family controls 70% of global Resources.The Revolution Win: A "Rot" country successfully hits 100% Development and Education without being destroyed, triggering a global wave of independence that bankrupts the Mafia system.5. Complications: "The Commission"Every 10 turns, "The Commission" (The UN/Global Bank) meets. If you are the Head Family, you dictate the rules. However, if your National Happiness or National Income is too low, the other Families can vote to "Strip the Title," moving the global currency from your "Dollar" to their "Credits."
