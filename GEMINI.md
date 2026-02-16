@@ -1,21 +1,33 @@
 
-The objective is to make a game for boardgamearena, using javascript on hte front end and php on the back end. The game is described below:
+The objective is to make a game for boardgamearena, using javascript on hte front end and php on the back end. The game is described below.
 
-1. The Core Concept: "The Fifth Freedom"
-In most strategy games, you "win" by improving your citizens' lives. In Grand Area, the player represents the "Planners" (the Council on Foreign Relations/State Department). Your goal is not the prosperity of the world, but the maintenance of disparity. You must keep the U.S. at 50% of the world's wealth with only 6% of its population.
+The game will feature a map of the world, similar to Risk.
 
-2. Player Actions: The Tools of Subordination
-Instead of building hospitals or schools in foreign territories, your actions focus on "improving the investment climate.""Preventing the Rot": If a country (e.g., Nicaragua or Laos) starts spending its budget on health, education, or land reform, you must intervene. These are "Nationalist" threats that must be framed as "Communist" threats to justify action."The Threat of a Good Example": You must destroy successful social programs in small, weak countries (like Laos) specifically so other countries don't see that independent development is possible."Managing the Fifth Freedom": Deploy "Police Repression" by funding local "thugs" and "death squads." As Chomsky notes, a "strong regime" (military dictatorship) is preferable to a "liberal government" that is "indulgent" toward its own people."Driving them into the arms of the USSR": Paradoxically, you may take actions to force a resisting country to seek help from the Soviet Union. This "justifies" your subsequent invasion or embargo to the domestic public."Information Management": You must spend "Ideological Points" to ensure the domestic U.S. population believes you are acting out of "disinterested benevolence" and "altruism," even while your internal memos (Top Secret documents) admit the goal is power.
 
-3. Key Mechanics: The "Investment Climate" vs. "Human Rights"
-The game would feature two inverse meters:Investment Climate: High levels allow U.S. corporations to repatriate profits. This is increased by "murdering priests" or "torturing peasant organizers" (actions cited by Chomsky as historically effective for business).Human Rights/Standard of Living: If this meter goes up, your "Wealth Disparity" score goes down. To "win," you must keep this meter as low as possible in the "Grand Area."
+1. Benevolent Cover (The PR Shield)
+The Action: You frame a military intervention or a corporate resource grab as a "Crusade for Democracy" or "Humanitarian Aid."
 
-4. Victory Conditions
-Unlike a typical game where you conquer the map, your victory is defined by stasis:The Disparity Goal: Maintain a specific ratio of world wealth (e.g., 50%) for your domestic elite.The Resource Monopoly: Ensure "our raw materials" (which happen to be under other people’s land) are never used by the indigenous populations for their own benefit.The Compliance Score: Every country in the "Grand Area" (Western Hemisphere, Far East, former British Empire) must remain "complementary to the industrial economies of the West."
+The Benefit: Reduces "Domestic Dissent" and prevents the "International Pariah" status. It allows you to keep tax-paying citizens supportive of the defense budget.
 
-Summary of Gameplay Loop
-You identify a "heresy" (a country raising its literacy rate) 
-You label it "Communist"
-You fund a "National Security State" (military coup)
-The Investment Climate improves
-You use "Ideological Slogans" to explain the resulting massacre as a "failed crusade for democracy" to your home audience.
+The Complication: "The Credibility Gap." If the intervention lasts too long or the "Strong Regime" you installed commits a massacre that leaks to the press (e.g., the My Lai massacre or the El Mozote massacre), your Benevolent Cover shatters. This triggers a Mass Protest Event, temporarily freezing your ability to send military aid.
+
+2. Direct Intervention (The Iron Fist)
+The Action: You bypass subversion and send in the Marines, or launch "Secret Bombing" campaigns (as in Laos).
+
+The Benefit: High success rate. It immediately resets the "Independent Development" meter of a target country to zero, effectively "killing the rot."
+
+The Complication: "The Soviet Pivot." Chomsky notes that when you unleash terror, the victims have "nowhere else to turn." Direct intervention drastically increases the chance that the target country becomes a Soviet Client. You "win" the battle by destroying their schools and hospitals, but you "lose" the territory to your rival's sphere of influence, forcing a long-term, expensive military standoff.
+
+3. Capital Flight (The Economic Noose)
+The Action: You organize an international boycott, freeze the target country's bank accounts, and withdraw all private investment.
+
+The Benefit: Destroys the target government’s ability to provide for its people without firing a single shot. It makes the "Communist" (populist) government look incompetent.
+
+The Complication: "The Black Market Leak." Prolonged economic warfare creates a power vacuum. Organized crime or rival factions (like the China player) may move in to provide "Alternative Credit." Furthermore, if you crash a large enough economy (like Brazil), you risk a Global Recession, which lowers your own "Wealth Disparity" score by hurting your own corporations’ quarterly profits.
+
+4. The Fifth Freedom (The Freedom to Rob)
+The Action: You install a "National Security State"—a military dictatorship that guarantees foreign firms can repatriate 100% of profits.
+
+The Benefit: Maximum "Investment Climate" score. Your wealth generation spikes as you extract raw materials at sub-market costs.
+
+The Complication: "The Refugee Surge." By destroying the "human rights climate" and the "living standards" of the local population to ensure the freedom to rob, you make the country unlivable. This generates a Migration Wave toward your own borders. In-game, this increases "Internal Xenophobia" and "Political Polarization" in the U.S. faction, making it harder to pass unified Grand Area policies.
