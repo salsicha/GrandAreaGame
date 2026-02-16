@@ -63,11 +63,20 @@ If a client country's family decides to use their Country Wealth to feed their p
 
 If a client country's family decides leave the global system. The controlling Family must "make an example" of them. If they don't, other families will stop paying tribute.
 
+The "Ministry of Truth" (The Narrative Engine)
 In this game, you don't just "do" things; you "frame" them:
-...
 
 The "Debt Shakedown" (IMF/World Bank Mechanic)
-...
+The Mafia doesn't just take resources; they lend money the victim can’t pay back.
+
+The "Rotten Apple" Theory (Contagion)
+This is the core of the "Example" mechanic.
+The Threat of a Good Example: If a small Client country successfully increases Education and National Happiness without the Head Family's help, it emits a "Defiance Aura."
+
+The "Intelligence Services" (The Consigliere)
+The Family needs a layer between them and the "Government" to handle the dirty work.
+The Black Budget: A hidden pool of Personal Capital used to fund Coup Attempts without a public vote.
+False Flags: A high-level action where you attack your own Armies or Resources and blame a Defiant country to gain a "Casus Belli" (Justification for War), resetting your Benevolent Cover to maximum.
 
 The regional families are trying to become the head family, the client families are trying to become regional or to break the system by becoming independant. The system only allows resource poor states to be independant
 
