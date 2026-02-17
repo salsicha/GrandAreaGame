@@ -1,0 +1,7 @@
+[
+  { "id": "promoting_democracy", "title": "Promoting Democracy", "desc": "Gain +20 Social Capital.", "target": "Self" },
+  { "id": "rotten_apple", "title": "The Rotten Apple", "desc": "Target loses 50% Happiness.", "target": "Other" },
+  { "id": "structural_adjustment", "title": "Structural Adjustment", "desc": "Steal 10 Wealth from target.", "target": "Other" },
+  { "id": "false_flag", "title": "The False Flag", "desc": "Pay 10 Wealth, Gain +50 Social Capital.", "target": "Self" },
+  { "id": "offshore_haven", "title": "Offshore Haven", "desc": "Gain +20 Stash immediately.", "target": "Self" }
+]

@@ -55,6 +55,12 @@
       const A = newState[actor]; const T = newState[target];
       if(!A){ logs.push(`WARN: actor ${actor} missing in state`); return; }
 
+      // Check if actor is eliminated
+      if(A.family === 'Anarchy' || A.family === 'Collapsed'){
+        logs.push(`${actor} is in ${A.family} and cannot act.`);
+        return;
+      }
+
       // helper: violent action requires benevolent cover (socialCapital)
       const requireCover = (actionName)=>{
         const coverNeeded = 20;
@@ -149,5 +155,157 @@
     return { newState, logs };
   }
 
-  window.Rules = { resolveTurn };
+  function resolveCleanup(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+
+    logs.push('--- Phase 4: The Heat (Cleanup) ---');
+
+    Object.keys(newState).forEach(family => {
+      const data = newState[family];
+      // Skip if not a valid territory object
+      if(!data || typeof data.happiness === 'undefined') return;
+
+      // Skip if already eliminated
+      if(data.family === 'Anarchy' || data.family === 'Collapsed') return;
+
+      // 1. Capital Checks (Zero Tolerance)
+      // Design: "When any of their capital values reach zero they lose"
+      if((data.stash||0) <= 0){
+        logs.push(`☠️ GAME OVER for ${family}: Personal Capital (Stash) hit zero.`);
+        data.family = 'Collapsed';
+      } else if((data.politicalCapital||0) <= 0){
+        logs.push(`☠️ GAME OVER for ${family}: Political Capital hit zero.`);
+        data.family = 'Collapsed';
+      } else if((data.socialCapital||0) <= 0){
+        logs.push(`☠️ GAME OVER for ${family}: Social Capital hit zero.`);
+        data.family = 'Collapsed';
+      }
+
+      if(data.family === 'Collapsed'){
+        data.wealth = 0;
+        data.stash = 0;
+        return;
+      }
+
+      // 2. Uprising Check: Happiness < Personal Capital (Stash)
+      if((data.happiness || 0) < (data.stash || 0)){
+        // Design: "If you fail, your people revolt." (Simulated with 50% chance)
+        if(Math.random() < 0.5){
+          logs.push(`☠️ UPRISING in ${family}! Happiness (${data.happiness}) < Stash (${data.stash}). The Family falls!`);
+          data.family = 'Anarchy'; 
+          data.stash = 0;
+          data.wealth = 0;
+          data.invaded = false;
+        } else {
+          logs.push(`⚠️ Unrest in ${family} (Happiness < Stash), but the regime holds.`);
+        }
+      }
+    });
+
+    return { newState, logs };
+  }
+
+  function resolveTribute(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+    logs.push('--- Phase 2: The Tribute ---');
+
+    // Define hierarchy for prototype (Head Families do not pay tribute)
+    const HEAD_FAMILIES = ['USA', 'China', 'Russia', 'EU', 'UK']; 
+    
+    Object.keys(newState).forEach(key => {
+      const t = newState[key];
+      // Skip if not a valid territory or has no family
+      if(!t || !t.family) return;
+      
+      // If family is a Head Family, they don't pay tribute
+      if(t.type === 'Head' || t.type === 'Regional' || HEAD_FAMILIES.includes(t.family)) return;
+      
+      // Skip if eliminated
+      if(t.family === 'Anarchy' || t.family === 'Collapsed') return;
+
+      // Determine who they pay (Default to 'USA' for prototype)
+      const overlord = t.clientOf || 'USA'; 
+      
+      // Check for Defiance
+      if(t.defiance && t.defiance > 0){
+        logs.push(`🚫 ${t.family} (in ${key}) REFUSES tribute to ${overlord}! (Defiance: ${t.defiance})`);
+        return;
+      }
+
+      // Calculate Tribute: 20% of Wealth
+      const amount = Math.floor((t.wealth || 0) * 0.20);
+      
+      if(amount > 0){
+        // Deduct from client
+        t.wealth = (t.wealth || 0) - amount;
+        
+        // Add to overlord. Find a territory owned by the overlord to receive funds.
+        let overlordTerritory = newState[overlord]; // Try direct key match
+        if(!overlordTerritory){
+            const overlordKey = Object.keys(newState).find(k => newState[k] && newState[k].family === overlord);
+            if(overlordKey) overlordTerritory = newState[overlordKey];
+        }
+
+        if(overlordTerritory){
+          overlordTerritory.wealth = (overlordTerritory.wealth || 0) + amount;
+          logs.push(`💸 ${t.family} (in ${key}) pays ${amount} tribute to ${overlord}`);
+        } else {
+          logs.push(`💸 ${t.family} (in ${key}) pays ${amount} tribute (Overlord ${overlord} has no territory)`);
+        }
+      }
+    });
+
+    return { newState, logs };
+  }
+
+  function resolveCard(state, cardId, actor, target){
+    const logs = [];
+    const newState = cloneTerritories(state);
+    const A = newState[actor];
+    const T = newState[target]; // target might be null if Self
+
+    logs.push(`🃏 ${actor} plays ${cardId} on ${target||'Self'}`);
+
+    switch(cardId){
+      case 'promoting_democracy':
+        if(A){ A.socialCapital = (A.socialCapital||0) + 20; logs.push(`${actor} gains +20 Social Capital`); }
+        break;
+      case 'rotten_apple':
+        if(T){ 
+            const lost = Math.floor((T.happiness||0) * 0.5);
+            T.happiness = (T.happiness||0) - lost;
+            logs.push(`${target} loses ${lost} Happiness`);
+        }
+        break;
+      case 'structural_adjustment':
+        if(A && T){
+            const amt = 10;
+            const stolen = Math.min(amt, T.wealth||0);
+            T.wealth = (T.wealth||0) - stolen;
+            A.wealth = (A.wealth||0) + stolen;
+            logs.push(`${actor} drains ${stolen} Wealth from ${target}`);
+        }
+        break;
+      case 'false_flag':
+        if(A){
+            A.wealth = Math.max(0, (A.wealth||0) - 10);
+            A.socialCapital = (A.socialCapital||0) + 50;
+            logs.push(`${actor} pays 10 Wealth for +50 Social Capital`);
+        }
+        break;
+      case 'offshore_haven':
+        if(A){
+            A.stash = (A.stash||0) + 20;
+            logs.push(`${actor} moves funds to Offshore Haven (+20 Stash)`);
+        }
+        break;
+      default:
+        logs.push(`Effect for ${cardId} not implemented.`);
+    }
+    return { newState, logs };
+  }
+
+  window.Rules = { resolveTurn, resolveCleanup, resolveTribute, resolveCard };
 })();

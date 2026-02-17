@@ -52,7 +52,7 @@ function showTooltipFor(el, ev){
   const country = el.dataset.country || el.id || 'Unknown';
   const data = state[country] || {};
   tooltip.querySelector('.title').textContent = country;
-  q('tt-family').textContent = data.family || '—';
+  q('tt-family').textContent = (data.family || '—') + (data.type === 'Client' ? ` → ${data.clientOf}` : '');
   q('tt-resources').textContent = data.resources || '—';
   q('tt-wealth').textContent = data.wealth != null ? data.wealth : '—';
   q('tt-happiness').textContent = data.happiness != null ? data.happiness : '—';
@@ -79,11 +79,13 @@ function updatePanel(country){
   const data = state[country];
   q('country-name').textContent = country;
   const el = document.querySelector(`[data-country="${country}"]`);
-  q('family').textContent = el ? el.dataset.family || data.family : data.family;
+  const famName = el ? el.dataset.family || data.family : data.family;
+  q('family').textContent = famName + (data.type === 'Client' ? ` (Client of ${data.clientOf})` : ` (${data.type})`);
   q('resources').textContent = el ? el.dataset.resources || data.resources : data.resources;
   q('wealth').textContent = data.wealth;
   q('happiness').textContent = data.happiness;
   q('stash').textContent = data.stash;
+  q('defiance').textContent = data.defiance > 0 ? 'YES' : 'No';
 }
 
 function selectTerritory(el){
@@ -146,15 +148,26 @@ function pulseTerritories(filterFn, duration=3000){
 async function init(){
   const data = await loadJSON('data/territories.json');
   // copy into state
-  Object.keys(data).forEach(k=> state[k] = Object.assign({}, data[k], {invaded:false}));
+  Object.keys(data).forEach(k=> {
+    const s = Object.assign({}, data[k], {invaded:false});
+    // Initialize Hierarchy Defaults
+    if(!s.type) s.type = ['USA','China','Russia','EU','UK'].includes(s.family) ? 'Head' : 'Client';
+    if(s.type === 'Client' && !s.clientOf) s.clientOf = 'USA';
+    state[k] = s;
+  });
+
   // load crisis deck
   try{ const crisis = await loadJSON('data/crisis.json'); state.crisisDeck = { drawPile: crisis.slice(), discard: [] }; } catch(e){ state.crisisDeck = { drawPile: [], discard: [] }; }
+  // load player cards
+  try{ state.cardDefs = await loadJSON('data/playercards.json'); } catch(e){ state.cardDefs=[]; }
+  initDeck();
+
   await loadMap();
   // game flow state
   state.pendingActions = {}; // family -> {action,target,locked}
   state.locks = {};
   state.submissions = {}; // family -> {sealed:true, revealed:false}
-  window.game = { round: 1, phaseIndex: 2, phases: ['Crisis','Tribute','Action Submission','Resolution'] };
+  window.game = { round: 1, phaseIndex: 2, phases: ['Crisis','Tribute','Action Submission','Resolution','Cleanup'] };
   renderPlayersList();
   wireButtons();
   // wire upload control
@@ -184,6 +197,28 @@ async function init(){
   q('pulse-invaded').addEventListener('click', ()=>{
     pulseTerritories((s)=> s.invaded === true, 3500);
   });
+
+  // Add Resolve Button to trigger Phase 4
+  const resolveBtn = document.createElement('button');
+  resolveBtn.textContent = 'Resolve Turn (Phase 3 & 4)';
+  resolveBtn.style.margin = '10px 0';
+  resolveBtn.addEventListener('click', revealAndResolve);
+  q('players-list').parentNode.insertBefore(resolveBtn, q('players-list'));
+
+  // Add Tribute Button
+  const tributeBtn = document.createElement('button');
+  tributeBtn.textContent = 'Run Tribute (Phase 2)';
+  tributeBtn.style.margin = '10px 0 10px 10px';
+  tributeBtn.addEventListener('click', runTribute);
+  resolveBtn.parentNode.insertBefore(tributeBtn, resolveBtn.nextSibling);
+
+  // Add Deal Cards Button
+  const dealBtn = document.createElement('button');
+  dealBtn.textContent = 'Deal Cards';
+  dealBtn.style.margin = '10px 0 10px 10px';
+  dealBtn.addEventListener('click', dealRoundCards);
+  tributeBtn.parentNode.insertBefore(dealBtn, tributeBtn.nextSibling);
+
   // select first available territory
   const first = document.querySelector('[data-country]');
   if(first) selectTerritory(first);
@@ -232,10 +267,112 @@ function renderCrisisUI(){
   if(!el.querySelector('.meta')) el.appendChild(meta);
 }
 
+// ------------------ Player Cards (Briefcase) ------------------
+function initDeck(){
+  state.hands = {};
+  state.deck = [];
+  if(!state.cardDefs) return;
+  // Create a deck with 3 copies of each card
+  for(let i=0; i<3; i++){
+    state.cardDefs.forEach(c => state.deck.push(c.id));
+  }
+  // Shuffle
+  for(let i=state.deck.length-1; i>0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [state.deck[i], state.deck[j]] = [state.deck[j], state.deck[i]];
+  }
+}
+
+function dealRoundCards(){
+  // Deal 1 card to every valid family
+  Object.keys(state).forEach(k => {
+    if(state[k] && state[k].family && state[k].family !== 'Anarchy' && state[k].family !== 'Collapsed'){
+      if(!state.hands[k]) state.hands[k] = [];
+      if(state.deck.length > 0) state.hands[k].push(state.deck.pop());
+    }
+  });
+  log('Dealt 1 card to all families.');
+  renderBriefcase();
+}
+
+function playCard(family, cardId, target){
+  if(!window.Rules || !window.Rules.resolveCard){ alert('Rules engine missing'); return; }
+  
+  const result = window.Rules.resolveCard(state, cardId, family, target);
+  
+  // Apply state
+  Object.keys(result.newState).forEach(k=>{
+    state[k] = Object.assign(state[k] || {}, result.newState[k]);
+  });
+  
+  // Remove card from hand
+  const idx = state.hands[family].indexOf(cardId);
+  if(idx > -1) state.hands[family].splice(idx, 1);
+
+  result.logs.forEach(l => log(l));
+  renderBriefcase();
+  if(selected) updatePanel(selected);
+}
+
+function renderBriefcase(){
+  // Find or create briefcase container
+  let container = q('briefcase-container');
+  if(!container){
+    container = document.createElement('div');
+    container.id = 'briefcase-container';
+    container.style.border = '1px solid #444';
+    container.style.padding = '10px';
+    container.style.margin = '10px 0';
+    container.style.background = '#222';
+    q('players-list').parentNode.insertBefore(container, q('players-list'));
+  }
+  
+  const viewer = (q('view-as') && q('view-as').value) || null;
+  container.innerHTML = `<h3>💼 The Briefcase (${viewer || 'None'})</h3>`;
+  
+  if(!viewer || !state.hands || !state.hands[viewer] || state.hands[viewer].length === 0){
+    container.innerHTML += '<div>No cards.</div>';
+    return;
+  }
+
+  state.hands[viewer].forEach(cardId => {
+    const def = state.cardDefs.find(c => c.id === cardId) || {title: cardId, desc: ''};
+    const cardEl = document.createElement('div');
+    cardEl.className = 'card';
+    cardEl.style.border = '1px solid #666';
+    cardEl.style.padding = '5px';
+    cardEl.style.marginBottom = '5px';
+    cardEl.innerHTML = `<strong>${def.title}</strong><br><small>${def.desc}</small><br>`;
+    
+    const playBtn = document.createElement('button');
+    playBtn.textContent = 'Play';
+    playBtn.onclick = () => {
+        // Simple target selection for prototype: use currently selected map territory or self
+        const target = (def.target === 'Self') ? viewer : (selected || viewer);
+        if(def.target === 'Other' && target === viewer){
+            alert('Select a different territory on the map to target.');
+            return;
+        }
+        playCard(viewer, cardId, target);
+    };
+    cardEl.appendChild(playBtn);
+    container.appendChild(cardEl);
+  });
+}
+
 // ----------------------- Turn manager functions -----------------------
 function idFromKey(key){ return `p_${key.replace(/\W+/g,'_')}` }
 
 const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect','Coup','FalseFlag'];
+
+function toggleDefiance(family){
+  const s = state[family];
+  if(!s) return;
+  s.defiance = s.defiance ? 0 : 1;
+  log(`${family} is now ${s.defiance ? 'DEFIANT (Refusing Tribute)' : 'Compliant'}`);
+  renderPlayersList();
+  if(selected === family) updatePanel(family);
+}
 
 function renderPlayersList(){
   const container = q('players-list');
@@ -243,6 +380,11 @@ function renderPlayersList(){
   // ensure view-as selector exists and is populated
   const viewAs = q('view-as');
   if(viewAs){
+    // Hook change event to update briefcase
+    if(!viewAs.hasAttribute('data-wired')){
+        viewAs.addEventListener('change', renderBriefcase);
+        viewAs.setAttribute('data-wired', 'true');
+    }
     const current = viewAs.value;
     viewAs.innerHTML = '';
     Object.keys(state).forEach(k=>{ if(k==='pendingActions' || k==='locks' || k==='submissions') return; const o=document.createElement('option'); o.value=k; o.textContent=k; viewAs.appendChild(o); });
@@ -251,8 +393,42 @@ function renderPlayersList(){
   Object.keys(state).forEach(family=>{
     if(family === 'pendingActions' || family === 'locks') return;
     if(family === 'submissions') return;
+    
+    const data = state[family];
+    // Filter out non-territory keys (like crisisDeck)
+    if(!data || typeof data.family === 'undefined') return;
+
+    const isDead = data.family === 'Collapsed' || data.family === 'Anarchy';
+
     const row = document.createElement('div'); row.className='player-row'; row.id = idFromKey(family);
     const name = document.createElement('div'); name.className='name'; name.textContent = family;
+    
+    // Add Client/Head info to name
+    if(data.type === 'Client'){
+        name.innerHTML += ` <small style="color:#888">(${data.clientOf})</small>`;
+    }
+
+    if(isDead){
+      name.textContent += ` (${data.family})`;
+      row.style.opacity = '0.5';
+      row.appendChild(name);
+      container.appendChild(row);
+      return;
+    }
+
+    // Defiance Toggle (Only for Clients)
+    if(data.type === 'Client'){
+        const defBtn = document.createElement('button');
+        const isDefiant = data.defiance > 0;
+        defBtn.textContent = isDefiant ? '✊ Defiant' : '🏳️ Compliant';
+        defBtn.title = isDefiant ? 'Refusing Tribute' : 'Paying Tribute';
+        defBtn.style.marginRight = '10px';
+        defBtn.style.fontSize = '0.8em';
+        defBtn.style.background = isDefiant ? '#d33' : '#333';
+        defBtn.onclick = () => toggleDefiance(family);
+        row.appendChild(defBtn);
+    }
+
     const actionSel = document.createElement('select'); actionSel.id = `action-${idFromKey(family)}`;
     ACTIONS.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.textContent=a; actionSel.appendChild(o); });
     const targetSel = document.createElement('select'); targetSel.id = `target-${idFromKey(family)}`;
@@ -288,6 +464,7 @@ function renderPlayersList(){
   });
   q('round-num').textContent = window.game.round;
   q('phase-name').textContent = window.game.phases[window.game.phaseIndex];
+  renderBriefcase();
 }
 
 function submitAction(family, action, target){
@@ -334,6 +511,24 @@ function resetRound(){
   log('Round reset — pending actions cleared');
 }
 
+function runTribute(){
+  if(!window.Rules || !window.Rules.resolveTribute){ alert('Rules engine not available'); return; }
+  const result = window.Rules.resolveTribute(state);
+  
+  // Apply state
+  Object.keys(result.newState).forEach(k=>{
+    state[k] = Object.assign(state[k] || {}, result.newState[k]);
+  });
+  
+  // Logs
+  result.logs.forEach(line=> log(line));
+  
+  // Update visuals
+  if(selected) updatePanel(selected);
+  
+  log('Tribute phase complete');
+}
+
 function revealAndResolve(){
   // if not all submitted, warn and ask for confirmation
   const families = Object.keys(state).filter(k=> k!=='pendingActions' && k!=='locks' && k!=='submissions');
@@ -345,14 +540,23 @@ function revealAndResolve(){
   // send actions to rules engine
   if(!window.Rules || !window.Rules.resolveTurn){ alert('Rules engine not available'); return; }
   const result = window.Rules.resolveTurn(state, actions);
+  
+  // Run Cleanup immediately after resolution for this prototype
+  const cleanupResult = window.Rules.resolveCleanup(result.newState);
+  
   // apply newState into live state object
-  Object.keys(result.newState).forEach(k=>{
-    state[k] = Object.assign(state[k] || {}, result.newState[k]);
+  // Merge cleanup results into the final state
+  Object.keys(cleanupResult.newState).forEach(k=>{
+    state[k] = Object.assign(state[k] || {}, cleanupResult.newState[k]);
   });
+
   // mark submissions as revealed
   Object.keys(state.submissions || {}).forEach(f=>{ if(state.submissions[f]) state.submissions[f].revealed = true; });
+  
   // show engine logs
   result.logs.forEach(line=> log(line));
+  cleanupResult.logs.forEach(line=> log(line));
+
   // update map visuals
   Object.keys(state).forEach(k=>{ if(k==='pendingActions' || k==='locks' || k==='submissions') return; const el = document.querySelector(`[data-country="${k}"]`); if(el){ if(state[k].invaded) el.classList.add('invaded'); else el.classList.remove('invaded'); } });
   // advance round and reset phase
