@@ -55,3 +55,10 @@ footer{padding:8px 18px;color:#636e72}
 .player-row .name{flex:1;font-weight:600}
 .player-row select, .player-row button{padding:6px;border-radius:6px;border:1px solid #e6e6e6;background:white}
 .locked{opacity:0.6}
+
+/* Crisis deck */
+#crisis-deck h4{margin:0 0 6px;font-size:14px}
+#deck-controls button{padding:6px;border-radius:6px;border:1px solid #e6e6e6;background:white;cursor:pointer}
+#current-crisis{font-size:13px}
+#current-crisis strong{display:block}
+#current-crisis .meta{color:#666;font-size:12px;margin-top:6px}

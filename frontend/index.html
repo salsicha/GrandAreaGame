@@ -62,6 +62,18 @@
             <button id="reset-round">Reset Round</button>
           </div>
           <div id="players-list" style="margin-top:10px"></div>
+          <div id="crisis-deck" style="margin-top:12px">
+            <h4>Crisis Deck</h4>
+            <div id="deck-controls" style="display:flex;gap:8px;margin-bottom:8px">
+              <button id="shuffle-deck">Shuffle Deck</button>
+              <button id="draw-card">Draw Card</button>
+              <button id="discard-card">Discard Current</button>
+            </div>
+            <div id="current-crisis" style="padding:8px;border-radius:6px;border:1px solid #eee;background:#fff;min-height:64px">
+              <strong>No card drawn</strong>
+              <div id="current-crisis-desc" style="margin-top:6px;color:#444"></div>
+            </div>
+          </div>
         </div>
 
         <div id="actions">
@@ -76,6 +88,7 @@
       <small>Prototype: static UI + simple interactions</small>
     </footer>
   </div>
+  <script src="rules.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

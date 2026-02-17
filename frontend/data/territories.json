@@ -1,9 +1,9 @@
 
 {
-  "Americas": {"family":"Regional","resources":"Oil/Grain","wealth":220,"happiness":95,"stash":40},
-  "Europe": {"family":"Head","resources":"Industry","wealth":200,"happiness":110,"stash":50},
-  "Africa": {"family":"Client","resources":"Minerals","wealth":120,"happiness":70,"stash":15},
-  "Asia": {"family":"Regional","resources":"Manufacturing","wealth":240,"happiness":100,"stash":45},
-  "Oceania": {"family":"Client","resources":"Minerals/Grain","wealth":80,"happiness":85,"stash":12}
+  "Americas": {"family":"Regional","resources":"Oil/Grain","wealth":220,"happiness":95,"stash":40,"socialCapital":80,"politicalCapital":90,"development":70,"defiance":0},
+  "Europe": {"family":"Head","resources":"Industry","wealth":200,"happiness":110,"stash":50,"socialCapital":110,"politicalCapital":120,"development":90,"defiance":0},
+  "Africa": {"family":"Client","resources":"Minerals","wealth":120,"happiness":70,"stash":15,"socialCapital":60,"politicalCapital":50,"development":40,"defiance":0},
+  "Asia": {"family":"Regional","resources":"Manufacturing","wealth":240,"happiness":100,"stash":45,"socialCapital":95,"politicalCapital":100,"development":85,"defiance":0},
+  "Oceania": {"family":"Client","resources":"Minerals/Grain","wealth":80,"happiness":85,"stash":12,"socialCapital":70,"politicalCapital":60,"development":50,"defiance":0}
 }
 

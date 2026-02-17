@@ -147,6 +147,8 @@ async function init(){
   const data = await loadJSON('data/territories.json');
   // copy into state
   Object.keys(data).forEach(k=> state[k] = Object.assign({}, data[k], {invaded:false}));
+  // load crisis deck
+  try{ const crisis = await loadJSON('data/crisis.json'); state.crisisDeck = { drawPile: crisis.slice(), discard: [] }; } catch(e){ state.crisisDeck = { drawPile: [], discard: [] }; }
   await loadMap();
   // game flow state
   state.pendingActions = {}; // family -> {action,target,locked}
@@ -164,6 +166,11 @@ async function init(){
     log(`Loaded SVG from ${f.name}`);
   });
   q('load-default').addEventListener('click', ()=>{ loadMap(); });
+  // crisis deck buttons
+  q('shuffle-deck').addEventListener('click', ()=>{ shuffleDeck(); });
+  q('draw-card').addEventListener('click', ()=>{ drawCard(); });
+  q('discard-card').addEventListener('click', ()=>{ discardCurrent(); });
+  renderCrisisUI();
   // legend buttons
   const toggle = q('toggle-legend');
   const legend = q('legend');
@@ -182,10 +189,53 @@ async function init(){
   if(first) selectTerritory(first);
 }
 
+// ------------------ Crisis deck functions ------------------
+function shuffleDeck(){
+  const deck = state.crisisDeck;
+  if(!deck) return;
+  // Fisher-Yates
+  for(let i = deck.drawPile.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const tmp = deck.drawPile[i]; deck.drawPile[i] = deck.drawPile[j]; deck.drawPile[j] = tmp; }
+  log('Crisis deck shuffled');
+  renderCrisisUI();
+}
+
+function drawCard(){
+  const deck = state.crisisDeck;
+  if(!deck || deck.drawPile.length === 0){ log('No cards to draw'); return; }
+  const card = deck.drawPile.shift();
+  deck.current = card;
+  // apply to state so rules engine can use it
+  state.crisis = card;
+  log(`Drew crisis card: ${card.title}`);
+  renderCrisisUI();
+}
+
+function discardCurrent(){
+  const deck = state.crisisDeck;
+  if(!deck || !deck.current){ log('No current card to discard'); return; }
+  deck.discard.push(deck.current);
+  log(`Discarded crisis: ${deck.current.title}`);
+  delete deck.current; delete state.crisis;
+  renderCrisisUI();
+}
+
+function renderCrisisUI(){
+  const cur = state.crisisDeck && state.crisisDeck.current;
+  const el = q('current-crisis');
+  const desc = q('current-crisis-desc');
+  if(!el) return;
+  if(cur){ el.querySelector('strong').textContent = cur.title; desc.textContent = cur.description || '';} else { el.querySelector('strong').textContent = 'No card drawn'; desc.textContent = ''; }
+  // show counts
+  const pileCount = (state.crisisDeck && state.crisisDeck.drawPile.length) || 0;
+  const discCount = (state.crisisDeck && state.crisisDeck.discard.length) || 0;
+  const meta = el.querySelector('.meta') || document.createElement('div'); meta.className = 'meta'; meta.textContent = `Deck: ${pileCount} · Discard: ${discCount}`;
+  if(!el.querySelector('.meta')) el.appendChild(meta);
+}
+
 // ----------------------- Turn manager functions -----------------------
 function idFromKey(key){ return `p_${key.replace(/\W+/g,'_')}` }
 
-const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect'];
+const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect','Coup','FalseFlag'];
 
 function renderPlayersList(){
   const container = q('players-list');
@@ -292,48 +342,24 @@ function revealAndResolve(){
 
   // collect actions, default to Pass if missing
   const actions = families.map(k=>({ family:k, action: (state.pendingActions[k] && state.pendingActions[k].action) || 'Pass', target: (state.pendingActions[k] && state.pendingActions[k].target) || 'Self' }));
-  // order by family 'strength' = wealth ascending (weakest first)
-  actions.sort((a,b)=> (state[a.family].wealth||0) - (state[b.family].wealth||0));
-  log('Resolving actions in weakest→strongest order');
-  actions.forEach(entry=>{
-    const actor = entry.family; const act = entry.action; let target = entry.target;
-    if(target === 'Self') target = actor;
-    log(`-> ${actor} plays ${act} against ${target}`);
-    const actorState = state[actor];
-    const targetState = state[target];
-    switch(act){
-      case 'Skim':{
-        const amt = 10; if(targetState){ const transferred = Math.min(amt, targetState.wealth||0); targetState.wealth = Math.max(0,(targetState.wealth||0)-transferred); actorState.stash = (actorState.stash||0)+transferred; targetState.happiness = Math.max(0,(targetState.happiness||0)-6); log(`${actor} skimmed ${transferred} from ${target}`); }
-        break;
-      }
-      case 'Propaganda':{
-        const cost = 8; if((actorState.stash||0) < cost){ log(`${actor}: Not enough stash for Propaganda`); } else { actorState.stash -= cost; if(targetState){ targetState.happiness = (targetState.happiness||0)+10; log(`${actor} spent ${cost} on propaganda for ${target}`); } }
-        break;
-      }
-      case 'Invade':{
-        if(targetState){ targetState.invaded = true; targetState.happiness = Math.max(0,(targetState.happiness||0)-15); log(`${actor} invaded ${target}`); }
-        break;
-      }
-      case 'Sanction':{
-        if(targetState){ const loss = Math.min(15, targetState.wealth||0); targetState.wealth = Math.max(0,(targetState.wealth||0)-loss); actorState.wealth = (actorState.wealth||0)+Math.floor(loss*0.2); targetState.happiness = Math.max(0,(targetState.happiness||0)-10); log(`${actor} sanctioned ${target} (-${loss} wealth)`); }
-        break;
-      }
-      case 'Protect':{
-        const cost = 6; if((actorState.stash||0) < cost){ log(`${actor}: Not enough stash to Protect`); } else { actorState.stash -= cost; if(targetState){ targetState.happiness = (targetState.happiness||0)+8; log(`${actor} protected ${target}`); } }
-        break;
-      }
-      default: log(`${actor} passed`);
-    }
-    // clamp values
-    if(targetState){ targetState.wealth = Math.max(0, targetState.wealth||0); targetState.happiness = Math.max(0, targetState.happiness||0); }
-    actorState.wealth = Math.max(0, actorState.wealth||0); actorState.stash = Math.max(0, actorState.stash||0);
+  // send actions to rules engine
+  if(!window.Rules || !window.Rules.resolveTurn){ alert('Rules engine not available'); return; }
+  const result = window.Rules.resolveTurn(state, actions);
+  // apply newState into live state object
+  Object.keys(result.newState).forEach(k=>{
+    state[k] = Object.assign(state[k] || {}, result.newState[k]);
   });
-  // update UI and advance round
-  Object.keys(state).forEach(k=>{ if(k==='pendingActions' || k==='locks') return; const el = document.querySelector(`[data-country="${k}"]`); if(el){ if(state[k].invaded) el.classList.add('invaded'); else el.classList.remove('invaded'); } });
+  // mark submissions as revealed
+  Object.keys(state.submissions || {}).forEach(f=>{ if(state.submissions[f]) state.submissions[f].revealed = true; });
+  // show engine logs
+  result.logs.forEach(line=> log(line));
+  // update map visuals
+  Object.keys(state).forEach(k=>{ if(k==='pendingActions' || k==='locks' || k==='submissions') return; const el = document.querySelector(`[data-country="${k}"]`); if(el){ if(state[k].invaded) el.classList.add('invaded'); else el.classList.remove('invaded'); } });
+  // advance round and reset phase
   window.game.round += 1; window.game.phaseIndex = 0; q('round-num').textContent = window.game.round; q('phase-name').textContent = window.game.phases[window.game.phaseIndex];
   // clear pending actions after resolution
   state.pendingActions = {};
-  // re-render players UI to clear locks
+  // re-render players UI to clear locks and show revealed state
   renderPlayersList();
   log('Resolution complete');
 }

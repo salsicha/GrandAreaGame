@@ -1,0 +1,17 @@
+[
+  {
+    "id": "guatemala1954",
+    "title": "Guatemala 1954",
+    "description": "A client state attempts land nationalization — head/regional families must respond.",
+    "type": "defiance_event",
+    "target": "Africa",
+    "effect": { "defiance_increase": 2 }
+  },
+  {
+    "id": "global_austerity",
+    "title": "Global Austerity",
+    "description": "Austerity measures reduce happiness worldwide.",
+    "type": "global",
+    "effect": { "happiness_delta": -10 }
+  }
+]
