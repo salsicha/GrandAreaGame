@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Grand Area — Frontend Prototype</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Grand Area — Prototype</h1>
+    </header>
+    <main>
+      <section id="map-area">
+        <!-- Map loader: default map.svg is loaded; you can also upload a custom SVG -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <label for="upload-svg">Upload SVG map:</label>
+          <input id="upload-svg" type="file" accept="image/svg+xml">
+          <button id="load-default">Load default map</button>
+        </div>
+        <div id="map-container">Loading map…</div>
+        <div id="tooltip" role="status" aria-hidden="true">
+          <div class="title">Territory</div>
+          <div class="row"><span>Family</span><span id="tt-family">—</span></div>
+          <div class="row"><span>Resources</span><span id="tt-resources">—</span></div>
+          <div class="row"><span>Wealth</span><span id="tt-wealth">—</span></div>
+          <div class="row"><span>Happiness</span><span id="tt-happiness">—</span></div>
+        </div>
+        <div id="legend" aria-hidden="false">
+          <div id="legend-title">Legend</div>
+          <div class="legend-row"><span class="swatch head"></span><span>Head Family</span></div>
+          <div class="legend-row"><span class="swatch regional"></span><span>Regional Family</span></div>
+          <div class="legend-row"><span class="swatch client"></span><span>Client Family</span></div>
+          <div class="legend-row"><span class="swatch invaded"></span><span>Invaded</span></div>
+          <div class="legend-controls">
+            <button id="toggle-legend">Hide Legend</button>
+            <button id="pulse-low">Pulse Low Happiness</button>
+            <button id="pulse-invaded">Pulse Invaded</button>
+          </div>
+        </div>
+      </section>
+      <aside id="panel">
+        <h2 id="country-name">Select a territory</h2>
+        <div id="info">
+          <p><strong>Family:</strong> <span id="family">—</span></p>
+          <p><strong>Resources:</strong> <span id="resources">—</span></p>
+          <p><strong>National Wealth:</strong> <span id="wealth">100</span></p>
+          <p><strong>National Happiness:</strong> <span id="happiness">100</span></p>
+          <p><strong>Family Stash:</strong> <span id="stash">20</span></p>
+        </div>
+        <div id="turn-manager">
+          <h3>Turn Manager</h3>
+          <div id="turn-status">Round <span id="round-num">1</span> — Phase: <span id="phase-name">Action Submission</span></div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <label for="view-as">View as:</label>
+            <select id="view-as"></select>
+          </div>
+          <div id="turn-controls" style="margin-top:8px;display:flex;gap:8px">
+            <button id="advance-phase">Advance Phase</button>
+            <button id="reveal-resolve">Reveal &amp; Resolve</button>
+            <button id="reset-round">Reset Round</button>
+          </div>
+          <div id="players-list" style="margin-top:10px"></div>
+        </div>
+
+        <div id="actions">
+          <button id="action-skim">Skim (move 10)</button>
+          <button id="action-prop">Propaganda (+10 happiness)</button>
+          <button id="action-invade">Invade (toggle)</button>
+        </div>
+        <div id="log"></div>
+      </aside>
+    </main>
+    <footer>
+      <small>Prototype: static UI + simple interactions</small>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

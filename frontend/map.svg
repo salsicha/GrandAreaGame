@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600">
+  <!-- Stylized regional map: Americas, Europe, Africa, Asia, Oceania -->
+  <style>
+    .label{font-family:Inter,Arial,sans-serif;fill:#2d3436;font-size:18px}
+    .territory{stroke:#2d3436;stroke-width:1}
+  </style>
+  <g id="territories">
+    <!-- Americas -->
+    <path id="t_americas" class="territory" d="M60,140 C140,60 260,40 360,120 C420,160 420,260 360,300 C220,340 120,300 60,240 Z" fill="#dfe6e9" data-country="Americas" />
+    <!-- Europe -->
+    <path id="t_europe" class="territory" d="M420,80 C500,40 580,50 640,90 C680,120 700,160 660,190 C600,220 520,200 480,160 Z" fill="#e8f5e9" data-country="Europe" />
+    <!-- Africa -->
+    <path id="t_africa" class="territory" d="M480,220 C540,220 620,260 660,320 C620,360 540,380 480,360 C420,340 420,280 460,240 Z" fill="#fff3e0" data-country="Africa" />
+    <!-- Asia -->
+    <path id="t_asia" class="territory" d="M700,80 C820,40 980,60 1040,140 C1080,190 1080,260 1040,300 C920,360 760,320 700,260 Z" fill="#e6f7ff" data-country="Asia" />
+    <!-- Oceania -->
+    <path id="t_oceania" class="territory" d="M980,360 C1020,340 1100,360 1120,400 C1100,440 1020,440 980,420 C960,400 960,380 980,360 Z" fill="#f3e5f5" data-country="Oceania" />
+
+    <text x="240" y="160" text-anchor="middle" class="label">Americas</text>
+    <text x="540" y="110" text-anchor="middle" class="label">Europe</text>
+    <text x="560" y="300" text-anchor="middle" class="label">Africa</text>
+    <text x="880" y="180" text-anchor="middle" class="label">Asia</text>
+    <text x="1040" y="400" text-anchor="middle" class="label">Oceania</text>
+  </g>
+</svg>

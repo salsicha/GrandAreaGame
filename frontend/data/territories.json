@@ -1,0 +1,9 @@
+
+{
+  "Americas": {"family":"Regional","resources":"Oil/Grain","wealth":220,"happiness":95,"stash":40},
+  "Europe": {"family":"Head","resources":"Industry","wealth":200,"happiness":110,"stash":50},
+  "Africa": {"family":"Client","resources":"Minerals","wealth":120,"happiness":70,"stash":15},
+  "Asia": {"family":"Regional","resources":"Manufacturing","wealth":240,"happiness":100,"stash":45},
+  "Oceania": {"family":"Client","resources":"Minerals/Grain","wealth":80,"happiness":85,"stash":12}
+}
+
