@@ -103,6 +103,20 @@ test('map interactions bind only territory elements', () => {
   assert.match(app, /container\.querySelectorAll\(\s*['"`]\[data-country\]['"`]\s*\)/);
 });
 
+test('territory clicks do not bubble to parent SVG groups', () => {
+  const app = readText('frontend', 'app.js');
+  assert.match(app, /el\.addEventListener\(\s*['"`]click['"`]\s*,\s*\(ev\)\s*=>\s*{/);
+  assert.match(app, /ev\.stopPropagation\(\);/);
+});
+
+test('frontend territory iteration uses territoryKeys helper', () => {
+  const app = readText('frontend', 'app.js');
+  assert.match(app, /function territoryKeys\(\)/);
+  assert.match(app, /function isTerritoryState\(value\)/);
+  assert.doesNotMatch(app, /Object\.keys\(state\)\.forEach\(k=>\{\s*if\(k==='pendingActions'/);
+  assert.match(app, /const families = territoryKeys\(\);/);
+});
+
 test('JSON data files parse and contain expected shapes', () => {
   const dataDir = fromRoot('frontend', 'data');
   const files = fs.readdirSync(dataDir).filter(file => file.endsWith('.json'));
@@ -118,6 +132,14 @@ test('JSON data files parse and contain expected shapes', () => {
   for (const [key, data] of Object.entries(territories)) {
     assert.ok(key.length > 0, 'territory keys must be non-empty');
     assert.equal(typeof data.family, 'string', `${key}.family`);
+    assert.ok(!['Head', 'Regional', 'Client'].includes(data.family), `${key}.family must be a family name, not a role`);
+    assert.ok(['Head', 'Regional', 'Client'].includes(data.type), `${key}.type`);
+    if (data.type === 'Client') {
+      assert.equal(typeof data.clientOf, 'string', `${key}.clientOf`);
+      assert.ok(data.clientOf.length > 0, `${key}.clientOf`);
+    } else {
+      assert.ok(data.clientOf == null, `${key}.clientOf should be null or omitted`);
+    }
     assert.equal(typeof data.resources, 'string', `${key}.resources`);
     for (const field of ['wealth', 'happiness', 'stash', 'socialCapital', 'politicalCapital', 'development', 'defiance']) {
       assert.equal(typeof data[field], 'number', `${key}.${field}`);
@@ -200,6 +222,50 @@ test('defiant clients refuse tribute', () => {
   assert.equal(result.newState.Clientia.wealth, 50);
   assert.equal(result.newState.USA.wealth, 100);
   assert.ok(result.logs.some(line => line.includes('REFUSES tribute')));
+});
+
+test('contagion uses territory type instead of family name', () => {
+  const Rules = loadRules();
+  const state = {
+    Alpha: territory({ family: 'Reformer Family', type: 'Client', happiness: 115 }),
+    Beta: territory({ family: 'Neighbor Family', type: 'Client', happiness: 80 }),
+    Gamma: territory({ family: 'Regional Family', type: 'Regional', happiness: 80 })
+  };
+
+  const result = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Propaganda', target: 'Self' }]);
+  assert.equal(result.newState.Alpha.happiness, 125);
+  assert.equal(result.newState.Beta.defiance, 1);
+  assert.equal(result.newState.Gamma.defiance, 0);
+});
+
+test('regional families do not pay tribute even when their family name is not hardcoded', () => {
+  const Rules = loadRules();
+  const state = {
+    USA: territory({ family: 'USA', type: 'Head', wealth: 100 }),
+    Regionalia: territory({ family: 'Regional Family', type: 'Regional', clientOf: null, wealth: 50 })
+  };
+
+  const result = Rules.resolveTribute(state);
+  assert.equal(result.newState.Regionalia.wealth, 50);
+  assert.equal(result.newState.USA.wealth, 100);
+});
+
+test('rules engine excludes runtime metadata from resolved state', () => {
+  const Rules = loadRules();
+  const state = {
+    USA: territory({ family: 'USA', type: 'Head', wealth: 100 }),
+    Clientia: territory({ family: 'Clientia', type: 'Client', clientOf: 'USA', wealth: 50 }),
+    crisisDeck: { drawPile: [], discard: [] },
+    cardDefs: [],
+    hands: { USA: ['promoting_democracy'] },
+    deck: ['offshore_haven'],
+    submissions: { USA: { sealed: true } },
+    pendingActions: {},
+    locks: {}
+  };
+
+  const result = Rules.resolveTribute(state);
+  assert.deepEqual(Object.keys(result.newState).sort(), ['Clientia', 'USA']);
 });
 
 test('global austerity crisis lowers territory happiness', () => {

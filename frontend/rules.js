@@ -5,15 +5,23 @@
   - actions: array of { family, action, target }
   Returns: { newState, logs }
 
-  This engine produces a new shallow-copied state for territories (does not clone metadata like pendingActions).
+  This engine produces a new shallow-copied state for territories and leaves runtime metadata out.
   It's intentionally small and synchronous for use in the browser prototype.
 */
 (function(){
+  function isTerritoryState(value){
+    return value
+      && typeof value === 'object'
+      && typeof value.family === 'string'
+      && typeof value.type === 'string'
+      && typeof value.wealth === 'number'
+      && typeof value.happiness === 'number';
+  }
+
   function cloneTerritories(state){
     const out = {};
     Object.keys(state).forEach(k=>{
-      if(k === 'pendingActions' || k === 'locks' || k === 'submissions') return;
-      out[k] = Object.assign({}, state[k]);
+      if(isTerritoryState(state[k])) out[k] = Object.assign({}, state[k]);
     });
     return out;
   }
@@ -46,7 +54,7 @@
     const normalized = actions.map(a=> ({ family:a.family, action:a.action || 'Pass', target: (a.target === 'Self' || !a.target) ? a.family : a.target }));
 
     // order: weakest (lowest wealth) first
-    normalized.sort((a,b)=> (newState[a.family].wealth||0) - (newState[b.family].wealth||0));
+    normalized.sort((a,b)=> ((newState[a.family] && newState[a.family].wealth)||0) - ((newState[b.family] && newState[b.family].wealth)||0));
     logs.push('Resolving actions (weakest → strongest)');
 
     normalized.forEach(entry=>{
@@ -139,12 +147,12 @@
     Object.keys(newState).forEach(k=>{
       const orig = original[k]; const cur = newState[k];
       if(!orig || !cur) return;
-      // treat 'Client' family as prone to contagion
-      if((orig.family === 'Client' || cur.family === 'Client') && (orig.happiness || 0) < H_THRESHOLD && (cur.happiness || 0) >= H_THRESHOLD){
+      // treat client territories as prone to contagion
+      if((orig.type === 'Client' || cur.type === 'Client') && (orig.happiness || 0) < H_THRESHOLD && (cur.happiness || 0) >= H_THRESHOLD){
         // contagion effect
         Object.keys(newState).forEach(o=>{
           if(o===k) return;
-          if(newState[o] && newState[o].family === 'Client'){
+          if(newState[o] && newState[o].type === 'Client'){
             newState[o].defiance = (newState[o].defiance||0) + 1;
             logs.push(`Contagion: ${o} defiance +1 due to ${k}`);
           }
@@ -211,16 +219,13 @@
     const newState = cloneTerritories(state);
     logs.push('--- Phase 2: The Tribute ---');
 
-    // Define hierarchy for prototype (Head Families do not pay tribute)
-    const HEAD_FAMILIES = ['USA', 'China', 'Russia', 'EU', 'UK']; 
-    
     Object.keys(newState).forEach(key => {
       const t = newState[key];
       // Skip if not a valid territory or has no family
       if(!t || !t.family) return;
       
-      // If family is a Head Family, they don't pay tribute
-      if(t.type === 'Head' || t.type === 'Regional' || HEAD_FAMILIES.includes(t.family)) return;
+      // If territory is Head or Regional, it doesn't pay tribute
+      if(t.type === 'Head' || t.type === 'Regional') return;
       
       // Skip if eliminated
       if(t.family === 'Anarchy' || t.family === 'Collapsed') return;

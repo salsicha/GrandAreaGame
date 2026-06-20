@@ -11,9 +11,9 @@ This backlog is organized around two goals:
 
 - [x] Fix the frontend startup bug where `app.js` writes to `#defiance` but `index.html` does not define that element.
 - [x] Restrict map click/hover binding to real territory elements, not every SVG element with an `id`.
-- [ ] Stop SVG click bubbling from selecting parent groups after a territory path is clicked.
-- [ ] Normalize the data model so `family`, `type`, and `clientOf` are separate concepts.
-- [ ] Keep runtime metadata (`crisisDeck`, `hands`, `deck`, `submissions`) out of territory/player iteration.
+- [x] Stop SVG click bubbling from selecting parent groups after a territory path is clicked.
+- [x] Normalize the data model so `family`, `type`, and `clientOf` are separate concepts.
+- [x] Keep runtime metadata (`crisisDeck`, `hands`, `deck`, `submissions`) out of territory/player iteration.
 - [ ] Wire or remove the existing `Advance Phase`, `Reveal & Resolve`, and `Reset Round` controls.
 - [ ] Decide whether the standalone action buttons and turn-manager actions are both needed, then consolidate the UI.
 - [x] Add a single verification command that runs JS parse checks, JSON validation, and PHP linting.
@@ -43,7 +43,7 @@ This backlog is organized around two goals:
 - [ ] Move canonical game resolution to the backend; the browser should never be authoritative for production play.
 - [ ] Make all random results server-side and replayable from logged seeds or BGA-provided random APIs.
 - [ ] Replace ad hoc global frontend state with a structured state object and pure rule helpers.
-- [ ] Add unit tests for tribute, defiance, crisis effects, action resolution, cleanup, cards, and victory/loss checks.
+- [x] Add unit tests for tribute, defiance, crisis effects, action resolution, cleanup, cards, and victory/loss checks.
 - [x] Add data validation for territories, cards, crisis cards, and SVG territory mappings.
 - [x] Add fixture-based tests that load all shipped JSON and verify every referenced id exists.
 - [ ] Add lint/format tooling for JS, CSS, JSON, PHP, and SQL.
@@ -86,9 +86,18 @@ This backlog is organized around two goals:
 
 ## Verification Checklist
 
+- [x] `npm test`
 - [x] `node --check frontend/app.js`
 - [x] `node --check frontend/rules.js`
+- [x] Static DOM id check for every `q(...)` reference in `frontend/app.js`.
+- [x] Map interaction check that only `[data-country]` elements receive territory handlers.
+- [x] SVG click propagation check for territory selection.
+- [x] Territory iteration check that runtime metadata stays out of player/target/action lists.
 - [x] JSON parse check for every file in `frontend/data/`
+- [x] Territory schema check for separated `family`, `type`, and `clientOf` fields.
 - [x] SVG/data consistency check for every `data-country` value.
+- [x] Player card id check that every shipped card has a rule handler.
+- [x] Rules unit tests for tribute, defiance, contagion, crisis effects, actions, cleanup, and card effects.
+- [x] Rules state-shape check that `crisisDeck`, `hands`, `deck`, and `submissions` are excluded from resolved territory state.
 - [x] PHP lint for every file in `bga/`.
 - [ ] Browser smoke test that loads `frontend/index.html`, selects a territory, runs tribute, submits actions, resolves, and verifies no console errors.
