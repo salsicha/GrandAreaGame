@@ -31,3 +31,18 @@ Run the test suite:
 ```bash
 npm test
 ```
+
+Other verification entrypoints:
+
+```bash
+npm run verify
+npm run lint
+npm run format:check
+```
+
+Production notes
+----------------
+
+- The browser prototype is useful for playtesting, but production BGA resolution belongs to `bga/modules/php/GrandAreaRules.php`.
+- Secret action commit/reveal, seeded replay, and persisted map state are scaffolded in `bga/grandareagame.game.php`.
+- See `bga/README_BGA.md` for hidden-information handling and material migration notes.

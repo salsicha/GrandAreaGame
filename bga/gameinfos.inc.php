@@ -1,0 +1,31 @@
+<?php
+
+$gameinfos = array(
+    'game_name' => 'Grand Area',
+    'designer' => 'Grand Area prototype team',
+    'artist' => 'Grand Area prototype team',
+    'year' => 2026,
+    'publisher' => 'Prototype',
+    'publisher_website' => '',
+    'publisher_bgg_id' => 0,
+    'bgg_id' => 0,
+    'players' => array(2, 3, 4, 5),
+    'suggest_player_number' => 4,
+    'not_recommend_player_number' => null,
+    'estimated_duration' => 90,
+    'fast_additional_time' => 30,
+    'medium_additional_time' => 40,
+    'slow_additional_time' => 50,
+    'tie_breaker_description' => 'Most completed objectives, then wealth, then political capital.',
+    'losers_not_ranked' => false,
+    'is_beta' => 1,
+    'is_coop' => 0,
+    'complexity' => 4,
+    'luck' => 2,
+    'strategy' => 5,
+    'diplomacy' => 5,
+    'player_colors' => array('ff0000', '008000', '0000ff', 'ffa500', '800080'),
+    'favorite_colors_support' => true,
+    'disable_player_order_swap_on_rematch' => false,
+    'game_interface_width' => array('min' => 740, 'max' => null)
+);

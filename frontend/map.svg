@@ -1,26 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600">
-  <!-- Stylized regional map: Americas, Europe, Africa, Asia, Oceania -->
   <style>
-    .label{font-family:Inter,Arial,sans-serif;fill:#2d3436;font-size:18px}
+    .label{font-family:Inter,Arial,sans-serif;fill:#2d3436;font-size:15px;pointer-events:none}
     .territory{stroke:#2d3436;stroke-width:1}
   </style>
   <g id="territories">
-    <!-- Americas -->
-    <path id="t_americas" class="territory" d="M60,140 C140,60 260,40 360,120 C420,160 420,260 360,300 C220,340 120,300 60,240 Z" fill="#dfe6e9" data-country="Americas" />
-    <!-- Europe -->
-    <path id="t_europe" class="territory" d="M420,80 C500,40 580,50 640,90 C680,120 700,160 660,190 C600,220 520,200 480,160 Z" fill="#e8f5e9" data-country="Europe" />
-    <!-- Africa -->
-    <path id="t_africa" class="territory" d="M480,220 C540,220 620,260 660,320 C620,360 540,380 480,360 C420,340 420,280 460,240 Z" fill="#fff3e0" data-country="Africa" />
-    <!-- Asia -->
-    <path id="t_asia" class="territory" d="M700,80 C820,40 980,60 1040,140 C1080,190 1080,260 1040,300 C920,360 760,320 700,260 Z" fill="#e6f7ff" data-country="Asia" />
-    <!-- Oceania -->
-    <path id="t_oceania" class="territory" d="M980,360 C1020,340 1100,360 1120,400 C1100,440 1020,440 980,420 C960,400 960,380 980,360 Z" fill="#f3e5f5" data-country="Oceania" />
+    <path id="t_north_america" class="territory" d="M50,110 C110,50 250,40 330,90 C390,130 380,220 310,250 C210,300 90,260 45,205 Z" fill="#dfe6e9" data-country="NorthAmerica" />
+    <path id="t_latin_america" class="territory" d="M210,280 C290,275 350,330 340,410 C330,500 250,550 195,500 C160,460 165,370 200,315 Z" fill="#fbe7c6" data-country="LatinAmerica" />
+    <path id="t_western_europe" class="territory" d="M430,95 C490,55 585,65 630,110 C655,145 635,190 575,205 C510,220 455,180 420,145 Z" fill="#e8f5e9" data-country="WesternEurope" />
+    <path id="t_eastern_europe" class="territory" d="M620,95 C690,70 770,95 805,145 C825,180 795,220 725,225 C660,225 615,185 600,140 Z" fill="#e1f5fe" data-country="EasternEurope" />
+    <path id="t_north_africa" class="territory" d="M455,235 C535,220 635,235 685,285 C655,330 550,345 465,320 C425,300 420,260 455,235 Z" fill="#fff3e0" data-country="NorthAfrica" />
+    <path id="t_sub_saharan_africa" class="territory" d="M505,330 C585,330 665,365 690,435 C650,505 540,520 485,465 C445,425 455,365 505,330 Z" fill="#f6e4d9" data-country="SubSaharanAfrica" />
+    <path id="t_middle_east" class="territory" d="M705,240 C760,220 835,235 870,280 C850,330 770,345 710,315 C680,295 680,260 705,240 Z" fill="#fef9c3" data-country="MiddleEast" />
+    <path id="t_south_asia" class="territory" d="M825,330 C890,300 965,330 985,390 C960,455 875,470 825,425 C790,395 790,355 825,330 Z" fill="#dcfce7" data-country="SouthAsia" />
+    <path id="t_east_asia" class="territory" d="M850,95 C960,55 1100,95 1145,180 C1165,250 1105,315 1000,310 C905,305 825,235 820,165 Z" fill="#e6f7ff" data-country="EastAsia" />
+    <path id="t_oceania" class="territory" d="M995,420 C1045,390 1130,410 1150,460 C1125,510 1035,515 990,485 C965,465 970,440 995,420 Z" fill="#f3e5f5" data-country="Oceania" />
 
-    <text x="240" y="160" text-anchor="middle" class="label">Americas</text>
-    <text x="540" y="110" text-anchor="middle" class="label">Europe</text>
-    <text x="560" y="300" text-anchor="middle" class="label">Africa</text>
-    <text x="880" y="180" text-anchor="middle" class="label">Asia</text>
-    <text x="1040" y="400" text-anchor="middle" class="label">Oceania</text>
+    <text x="205" y="160" text-anchor="middle" class="label">North America</text>
+    <text x="250" y="410" text-anchor="middle" class="label">Latin America</text>
+    <text x="525" y="135" text-anchor="middle" class="label">Western Europe</text>
+    <text x="710" y="150" text-anchor="middle" class="label">Eastern Europe</text>
+    <text x="555" y="285" text-anchor="middle" class="label">North Africa</text>
+    <text x="575" y="425" text-anchor="middle" class="label">Sub-Saharan Africa</text>
+    <text x="775" y="285" text-anchor="middle" class="label">Middle East</text>
+    <text x="895" y="390" text-anchor="middle" class="label">South Asia</text>
+    <text x="990" y="190" text-anchor="middle" class="label">East Asia</text>
+    <text x="1070" y="465" text-anchor="middle" class="label">Oceania</text>
   </g>
 </svg>

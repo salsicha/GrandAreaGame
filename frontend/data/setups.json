@@ -1,0 +1,41 @@
+{
+  "2": {
+    "players": 2,
+    "families": ["USA", "China"],
+    "territories": {
+      "USA": ["NorthAmerica", "LatinAmerica", "Oceania"],
+      "China": ["EastAsia", "SouthAsia", "MiddleEast"],
+      "Neutral": ["WesternEurope", "EasternEurope", "NorthAfrica", "SubSaharanAfrica"]
+    }
+  },
+  "3": {
+    "players": 3,
+    "families": ["USA", "EU", "China"],
+    "territories": {
+      "USA": ["NorthAmerica", "LatinAmerica", "Oceania"],
+      "EU": ["WesternEurope", "EasternEurope", "NorthAfrica", "SubSaharanAfrica"],
+      "China": ["EastAsia", "SouthAsia", "MiddleEast"]
+    }
+  },
+  "4": {
+    "players": 4,
+    "families": ["USA", "EU", "China", "India"],
+    "territories": {
+      "USA": ["NorthAmerica", "LatinAmerica", "Oceania"],
+      "EU": ["WesternEurope", "EasternEurope", "NorthAfrica", "SubSaharanAfrica"],
+      "China": ["EastAsia"],
+      "India": ["SouthAsia", "MiddleEast"]
+    }
+  },
+  "5": {
+    "players": 5,
+    "families": ["USA", "EU", "China", "India", "Gulf Council"],
+    "territories": {
+      "USA": ["NorthAmerica", "LatinAmerica", "Oceania"],
+      "EU": ["WesternEurope", "EasternEurope", "NorthAfrica", "SubSaharanAfrica"],
+      "China": ["EastAsia"],
+      "India": ["SouthAsia"],
+      "Gulf Council": ["MiddleEast"]
+    }
+  }
+}

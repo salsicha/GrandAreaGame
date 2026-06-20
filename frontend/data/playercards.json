@@ -1,7 +1,21 @@
 [
-  { "id": "promoting_democracy", "title": "Promoting Democracy", "desc": "Gain +20 Social Capital.", "target": "Self" },
-  { "id": "rotten_apple", "title": "The Rotten Apple", "desc": "Target loses 50% Happiness.", "target": "Other" },
-  { "id": "structural_adjustment", "title": "Structural Adjustment", "desc": "Steal 10 Wealth from target.", "target": "Other" },
-  { "id": "false_flag", "title": "The False Flag", "desc": "Pay 10 Wealth, Gain +50 Social Capital.", "target": "Self" },
-  { "id": "offshore_haven", "title": "Offshore Haven", "desc": "Gain +20 Stash immediately.", "target": "Self" }
+  { "id": "promoting_democracy", "title": "Promoting Democracy", "category": "spin", "desc": "Gain +20 Social Capital.", "target": "Self" },
+  { "id": "media_blitz", "title": "Media Blitz", "category": "spin", "desc": "Gain Social Capital and a small Political Capital lift.", "target": "Self" },
+  { "id": "humanitarian_airlift", "title": "Humanitarian Airlift", "category": "spin", "desc": "Raise target happiness and gain narrative cover.", "target": "Other" },
+  { "id": "patriotic_rally", "title": "Patriotic Rally", "category": "spin", "desc": "Convert domestic pressure into Political Capital at a small happiness cost.", "target": "Self" },
+
+  { "id": "structural_adjustment", "title": "Structural Adjustment", "category": "leverage", "desc": "Drain 10 Education from target into actor wealth.", "target": "Other" },
+  { "id": "debt_trap", "title": "Debt Trap", "category": "leverage", "desc": "Raise target debt, lower happiness, and gain wealth.", "target": "Other" },
+  { "id": "protection_pact", "title": "Protection Pact", "category": "leverage", "desc": "Protect target and gain Political Capital at stash cost.", "target": "Other" },
+  { "id": "resource_contract", "title": "Resource Contract", "category": "leverage", "desc": "Extract target wealth and development through an unequal contract.", "target": "Other" },
+
+  { "id": "false_flag", "title": "The False Flag", "category": "intelligence", "desc": "Pay Black Budget to gain Social Capital.", "target": "Self" },
+  { "id": "covert_files", "title": "Covert Files", "category": "intelligence", "desc": "Expose target files to raise governance pressure and factional division.", "target": "Other" },
+  { "id": "kompromat", "title": "Kompromat", "category": "intelligence", "desc": "Damage target Political Capital and gain leverage.", "target": "Other" },
+  { "id": "counterintelligence", "title": "Counterintelligence", "category": "intelligence", "desc": "Restore Black Budget and reduce factional division.", "target": "Self" },
+
+  { "id": "rotten_apple", "title": "The Rotten Apple", "category": "retaliation", "desc": "Target loses 50% Happiness.", "target": "Other" },
+  { "id": "sanctions_package", "title": "Sanctions Package", "category": "retaliation", "desc": "Damage target wealth and happiness at Social Capital cost.", "target": "Other" },
+  { "id": "proxy_network", "title": "Proxy Network", "category": "retaliation", "desc": "Spend Black Budget to raise target defiance and factional division.", "target": "Other" },
+  { "id": "retaliation_strike", "title": "Retaliation Strike", "category": "retaliation", "desc": "Spend Black Budget for direct target wealth damage and fear.", "target": "Other" }
 ]

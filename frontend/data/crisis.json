@@ -2,16 +2,112 @@
   {
     "id": "guatemala1954",
     "title": "Guatemala 1954",
-    "description": "A client state attempts land nationalization — head/regional families must respond.",
+    "description": "A client land reform crisis raises defiance and tests whether the hierarchy responds with pressure or accommodation.",
     "type": "defiance_event",
-    "target": "Africa",
-    "effect": { "defiance_increase": 2 }
+    "targeting": { "scope": "territory", "territory": "LatinAmerica" },
+    "target": "LatinAmerica",
+    "escalation": 2,
+    "era": "Cold War",
+    "tags": ["land_reform", "client", "covert"],
+    "effect": { "defiance_increase": 2, "governanceChangeSentiment_delta": 4 }
   },
   {
     "id": "global_austerity",
     "title": "Global Austerity",
-    "description": "Austerity measures reduce happiness worldwide.",
-    "type": "global",
-    "effect": { "happiness_delta": -10 }
+    "description": "Worldwide austerity lowers happiness, with harsher pressure where grain or finance access is missing.",
+    "type": "global_economic",
+    "targeting": { "scope": "all" },
+    "escalation": 1,
+    "era": "Neoliberal",
+    "tags": ["finance", "austerity", "global"],
+    "effect": { "happiness_delta": -10, "vulnerableResourceNeeds": ["Grain", "Finance"], "vulnerability_happiness_delta": -5 }
+  },
+  {
+    "id": "oil_embargo",
+    "title": "Oil Embargo",
+    "description": "Territories that need oil lose wealth and development as upkeep and logistics spike.",
+    "type": "resource_shock",
+    "targeting": { "scope": "resourceNeed", "resource": "Oil" },
+    "escalation": 2,
+    "era": "Energy Crisis",
+    "tags": ["oil", "logistics", "resource"],
+    "effect": { "wealth_delta": -12, "development_delta": -4, "happiness_delta": -4 }
+  },
+  {
+    "id": "grain_price_spike",
+    "title": "Grain Price Spike",
+    "description": "Food import pressure turns economic weakness into street-level unrest.",
+    "type": "resource_shock",
+    "targeting": { "scope": "resourceNeed", "resource": "Grain" },
+    "escalation": 2,
+    "era": "Contemporary",
+    "tags": ["grain", "unrest", "resource"],
+    "effect": { "happiness_delta": -8, "governanceChangeSentiment_delta": 6 }
+  },
+  {
+    "id": "debt_crisis",
+    "title": "Debt Crisis",
+    "description": "The most indebted territory absorbs a legitimacy shock and loses development momentum.",
+    "type": "financial_crisis",
+    "targeting": { "scope": "highestDebt" },
+    "escalation": 3,
+    "era": "Neoliberal",
+    "tags": ["debt", "finance", "legitimacy"],
+    "effect": { "debt_delta": 10, "happiness_delta": -10, "development_delta": -6, "governanceChangeSentiment_delta": 8 }
+  },
+  {
+    "id": "shipping_chokepoint",
+    "title": "Shipping Chokepoint",
+    "description": "Shipping control becomes a crisis for economies that lack resilient logistics.",
+    "type": "resource_shock",
+    "targeting": { "scope": "resourceNeed", "resource": "Shipping" },
+    "escalation": 2,
+    "era": "Contemporary",
+    "tags": ["shipping", "trade", "resource"],
+    "effect": { "wealth_delta": -10, "development_delta": -5 }
+  },
+  {
+    "id": "leaked_accounts",
+    "title": "Leaked Accounts",
+    "description": "Hidden family wealth becomes public and feeds governance-change sentiment.",
+    "type": "legitimacy_scandal",
+    "targeting": { "scope": "highestFactionalDivision" },
+    "escalation": 1,
+    "era": "Contemporary",
+    "tags": ["corruption", "media", "legitimacy"],
+    "effect": { "socialCapital_delta": -10, "governanceChangeSentiment_delta": 10, "factionalDivision_delta": 5 }
+  },
+  {
+    "id": "student_uprising",
+    "title": "Student Uprising",
+    "description": "Educated publics organize quickly when happiness is low and the state looks brittle.",
+    "type": "governance_crisis",
+    "targeting": { "scope": "all" },
+    "escalation": 2,
+    "era": "Contemporary",
+    "tags": ["education", "governance", "street_pressure"],
+    "effect": { "governanceChangeSentiment_delta": 4, "factionalDivision_delta": 3 }
+  },
+  {
+    "id": "client_realignment",
+    "title": "Client Realignment",
+    "description": "Defiant clients test whether a rival patron can make independence credible.",
+    "type": "alignment_crisis",
+    "targeting": { "scope": "defiantClients" },
+    "escalation": 3,
+    "era": "Multipolar",
+    "tags": ["client", "realignment", "defiance"],
+    "effect": { "independenceSentiment_delta": 8, "politicalCapital_delta": 4 }
+  },
+  {
+    "id": "tech_sanctions",
+    "title": "Technology Sanctions",
+    "description": "Technology access becomes a weapon against development and domestic legitimacy.",
+    "type": "resource_shock",
+    "targeting": { "scope": "resourceNeed", "resource": "Technology" },
+    "escalation": 2,
+    "era": "Contemporary",
+    "tags": ["technology", "sanctions", "development"],
+    "effect": { "development_delta": -8, "education_delta": -3, "happiness_delta": -4 }
   }
 ]

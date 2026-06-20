@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "node tests/run-tests.js"
+    "test": "node tests/run-tests.js",
+    "verify": "npm test",
+    "lint": "node tests/run-tests.js --lint",
+    "format:check": "node tests/run-tests.js --format-check",
+    "simulate": "node tools/simulate-balance.js"
   }
 }

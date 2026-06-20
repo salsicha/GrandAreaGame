@@ -13,11 +13,22 @@
     </header>
     <main>
       <section id="map-area">
-        <!-- Map loader: default map.svg is loaded; you can also upload a custom SVG -->
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <div id="notice" role="status" aria-live="polite"></div>
+        <div class="toolbar map-toolbar">
           <label for="upload-svg">Upload SVG map:</label>
           <input id="upload-svg" type="file" accept="image/svg+xml">
           <button id="load-default">Load default map</button>
+          <label for="overlay-mode">Overlay:</label>
+          <select id="overlay-mode" aria-label="Map overlay">
+            <option value="role">Role</option>
+            <option value="owner">Owner</option>
+            <option value="resource">Resource</option>
+            <option value="happiness">Happiness</option>
+            <option value="defiance">Defiance</option>
+            <option value="invaded">Invaded</option>
+            <option value="sanctioned">Sanctioned</option>
+            <option value="protected">Protected</option>
+          </select>
         </div>
         <div id="map-container">Loading map…</div>
         <div id="tooltip" role="status" aria-hidden="true">
@@ -44,41 +55,57 @@
         <h2 id="country-name">Select a territory</h2>
         <div id="info">
           <p><strong>Family:</strong> <span id="family">—</span></p>
+          <p><strong>Role:</strong> <span id="role">—</span></p>
+          <p><strong>Client Of:</strong> <span id="client-of">—</span></p>
           <p><strong>Resources:</strong> <span id="resources">—</span></p>
           <p><strong>National Wealth:</strong> <span id="wealth">100</span></p>
           <p><strong>National Happiness:</strong> <span id="happiness">100</span></p>
           <p><strong>Family Stash:</strong> <span id="stash">20</span></p>
+          <p><strong>Black Budget:</strong> <span id="black-budget">0</span></p>
+          <p><strong>Social Capital:</strong> <span id="social-capital">0</span></p>
+          <p><strong>Political Capital:</strong> <span id="political-capital">0</span></p>
+          <p><strong>Education:</strong> <span id="education">0</span></p>
+          <p><strong>Development:</strong> <span id="development">0</span></p>
           <p><strong>Defiance:</strong> <span id="defiance">No</span></p>
         </div>
         <div id="turn-manager">
           <h3>Turn Manager</h3>
           <div id="turn-status">Round <span id="round-num">1</span> — Phase: <span id="phase-name">Action Submission</span></div>
-          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <div class="toolbar view-toolbar">
             <label for="view-as">View as:</label>
             <select id="view-as"></select>
           </div>
-          <div id="turn-controls" style="margin-top:8px;display:flex;gap:8px">
+          <div id="turn-controls" class="toolbar">
             <button id="advance-phase">Advance Phase</button>
             <button id="reveal-resolve">Reveal &amp; Resolve</button>
             <button id="reset-round">Reset Round</button>
           </div>
-          <div id="players-list" style="margin-top:10px"></div>
-          <div id="crisis-deck" style="margin-top:12px">
+          <div id="players-list"></div>
+          <div id="crisis-deck">
             <h4>Crisis Deck</h4>
-            <div id="deck-controls" style="display:flex;gap:8px;margin-bottom:8px">
+            <div id="deck-controls" class="toolbar">
               <button id="shuffle-deck">Shuffle Deck</button>
               <button id="draw-card">Draw Card</button>
               <button id="discard-card">Discard Current</button>
             </div>
-            <div id="current-crisis" style="padding:8px;border-radius:6px;border:1px solid #eee;background:#fff;min-height:64px">
+            <div id="current-crisis">
               <strong>No card drawn</strong>
-              <div id="current-crisis-desc" style="margin-top:6px;color:#444"></div>
+              <div id="current-crisis-desc"></div>
             </div>
           </div>
         </div>
         <div id="log"></div>
       </aside>
     </main>
+    <div id="confirm-dialog" class="dialog" hidden>
+      <div class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-message">
+        <p id="confirm-message"></p>
+        <div class="toolbar">
+          <button id="confirm-yes">Continue</button>
+          <button id="confirm-no">Cancel</button>
+        </div>
+      </div>
+    </div>
     <footer>
       <small>Prototype: static UI + simple interactions</small>
     </footer>

@@ -1,0 +1,23 @@
+#grandarea_table {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) 280px;
+  gap: 16px;
+}
+
+#grandarea_map,
+#grandarea_side_panel {
+  border: 1px solid #d6d6d6;
+  background: #fff;
+  min-height: 240px;
+  padding: 12px;
+}
+
+.grandarea-log {
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  #grandarea_table {
+    grid-template-columns: 1fr;
+  }
+}

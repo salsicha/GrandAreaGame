@@ -1,7 +1,12 @@
 {
-  "t_americas": "Americas",
-  "t_europe": "Europe",
-  "t_africa": "Africa",
-  "t_asia": "Asia",
+  "t_north_america": "NorthAmerica",
+  "t_latin_america": "LatinAmerica",
+  "t_western_europe": "WesternEurope",
+  "t_eastern_europe": "EasternEurope",
+  "t_north_africa": "NorthAfrica",
+  "t_sub_saharan_africa": "SubSaharanAfrica",
+  "t_middle_east": "MiddleEast",
+  "t_south_asia": "SouthAsia",
+  "t_east_asia": "EastAsia",
   "t_oceania": "Oceania"
 }

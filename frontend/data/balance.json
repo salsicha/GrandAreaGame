@@ -1,0 +1,37 @@
+{
+  "numericRanges": {
+    "wealth": {"min": 0, "max": 300, "starting": [80, 240]},
+    "happiness": {"min": 0, "max": 200, "starting": [68, 110]},
+    "stash": {"min": 0, "max": 80, "starting": [12, 50]},
+    "blackBudget": {"min": 0, "max": 50, "starting": [6, 32]},
+    "socialCapital": {"min": 0, "max": 150, "starting": [56, 118]},
+    "politicalCapital": {"min": 0, "max": 150, "starting": [46, 118]},
+    "education": {"min": 0, "max": 150, "starting": [38, 86]},
+    "development": {"min": 0, "max": 150, "starting": [38, 92]},
+    "debt": {"min": 0, "max": 100, "starting": [0, 14]},
+    "armies": {"min": 0, "max": 8, "starting": [1, 5]}
+  },
+  "actionEconomy": {
+    "actionsPerPlayerPerRound": 1,
+    "cardsDealtPerPlayerPerRound": 1,
+    "maxCardsInHand": 5,
+    "framingSpendPerAction": {"min": 0, "max": 50},
+    "capitalChangeBands": {
+      "minor": [1, 5],
+      "major": [6, 15],
+      "crisis": [16, 30]
+    }
+  },
+  "comebackPressure": {
+    "headWealthThreshold": 260,
+    "clientDefianceGain": 1,
+    "regionalPoliticalGain": 4,
+    "headSocialCapitalPenalty": 6
+  },
+  "clientVictoryPath": {
+    "requiresDefiance": true,
+    "minimumHappiness": 120,
+    "minimumDevelopment": 70,
+    "minimumIndependenceSentiment": 60
+  }
+}
