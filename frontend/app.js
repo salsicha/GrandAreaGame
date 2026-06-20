@@ -120,39 +120,6 @@ function selectTerritory(el){
   log(`Selected ${country}`);
 }
 
-function wireButtons(){
-  q('action-skim').addEventListener('click', ()=>{
-    if(!selected){alert('Select a territory first');return}
-    const t = state[selected];
-    const amount = 10;
-    t.wealth = Math.max(0, t.wealth - amount);
-    t.stash += amount;
-    t.happiness = Math.max(0, t.happiness - 6);
-    updatePanel(selected);
-    log(`${selected}: Skimmed ${amount} → stash now ${t.stash}`);
-  });
-
-  q('action-prop').addEventListener('click', ()=>{
-    if(!selected){alert('Select a territory first');return}
-    const t = state[selected];
-    const cost = 8;
-    if(t.stash < cost){ log(`${selected}: Not enough stash for propaganda`); return }
-    t.stash -= cost; t.happiness = Math.min(200, t.happiness + 10);
-    updatePanel(selected);
-    log(`${selected}: Spent ${cost} on propaganda → happiness ${t.happiness}`);
-  });
-
-  q('action-invade').addEventListener('click', ()=>{
-    if(!selected){alert('Select a territory first');return}
-    const t = state[selected];
-    t.invaded = !t.invaded;
-    const el = document.querySelector(`[data-country="${selected}"]`);
-    if(t.invaded){ el.classList.add('invaded'); log(`${selected}: Invaded — public outrage +15`); t.happiness = Math.max(0, t.happiness - 15);} 
-    else { el.classList.remove('invaded'); log(`${selected}: Invasion withdrawn`); }
-    updatePanel(selected);
-  });
-}
-
 // Legend & animation controls
 function renderLegend(){
   // nothing dynamic for now; buttons wired in init
@@ -191,7 +158,6 @@ async function init(){
   state.submissions = {}; // family -> {sealed:true, revealed:false}
   window.game = { round: 1, phaseIndex: 2, phases: ['Crisis','Tribute','Action Submission','Resolution','Cleanup'] };
   renderPlayersList();
-  wireButtons();
   // wire upload control
   q('upload-svg').addEventListener('change', async (ev)=>{
     const f = ev.target.files && ev.target.files[0];
@@ -220,19 +186,16 @@ async function init(){
     pulseTerritories((s)=> s.invaded === true, 3500);
   });
 
-  // Add Resolve Button to trigger Phase 4
-  const resolveBtn = document.createElement('button');
-  resolveBtn.textContent = 'Resolve Turn (Phase 3 & 4)';
-  resolveBtn.style.margin = '10px 0';
-  resolveBtn.addEventListener('click', revealAndResolve);
-  q('players-list').parentNode.insertBefore(resolveBtn, q('players-list'));
+  q('advance-phase').addEventListener('click', advancePhase);
+  q('reveal-resolve').addEventListener('click', revealAndResolve);
+  q('reset-round').addEventListener('click', resetRound);
 
   // Add Tribute Button
   const tributeBtn = document.createElement('button');
   tributeBtn.textContent = 'Run Tribute (Phase 2)';
   tributeBtn.style.margin = '10px 0 10px 10px';
   tributeBtn.addEventListener('click', runTribute);
-  resolveBtn.parentNode.insertBefore(tributeBtn, resolveBtn.nextSibling);
+  q('players-list').parentNode.insertBefore(tributeBtn, q('players-list'));
 
   // Add Deal Cards Button
   const dealBtn = document.createElement('button');

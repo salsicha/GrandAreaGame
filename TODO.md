@@ -14,8 +14,8 @@ This backlog is organized around two goals:
 - [x] Stop SVG click bubbling from selecting parent groups after a territory path is clicked.
 - [x] Normalize the data model so `family`, `type`, and `clientOf` are separate concepts.
 - [x] Keep runtime metadata (`crisisDeck`, `hands`, `deck`, `submissions`) out of territory/player iteration.
-- [ ] Wire or remove the existing `Advance Phase`, `Reveal & Resolve`, and `Reset Round` controls.
-- [ ] Decide whether the standalone action buttons and turn-manager actions are both needed, then consolidate the UI.
+- [x] Wire or remove the existing `Advance Phase`, `Reveal & Resolve`, and `Reset Round` controls.
+- [x] Decide whether the standalone action buttons and turn-manager actions are both needed, then consolidate the UI.
 - [x] Add a single verification command that runs JS parse checks, JSON validation, and PHP linting.
 
 ## Gameplay Enrichment

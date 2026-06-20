@@ -117,6 +117,23 @@ test('frontend territory iteration uses territoryKeys helper', () => {
   assert.match(app, /const families = territoryKeys\(\);/);
 });
 
+test('existing turn manager controls are wired', () => {
+  const app = readText('frontend', 'app.js');
+  assert.match(app, /q\(['"]advance-phase['"]\)\.addEventListener\(['"]click['"],\s*advancePhase\)/);
+  assert.match(app, /q\(['"]reveal-resolve['"]\)\.addEventListener\(['"]click['"],\s*revealAndResolve\)/);
+  assert.match(app, /q\(['"]reset-round['"]\)\.addEventListener\(['"]click['"],\s*resetRound\)/);
+  assert.doesNotMatch(app, /Resolve Turn \(Phase 3 & 4\)/);
+});
+
+test('actions are consolidated into the turn manager', () => {
+  const app = readText('frontend', 'app.js');
+  const html = readText('frontend', 'index.html');
+  assert.doesNotMatch(app, /function wireButtons\(/);
+  assert.doesNotMatch(app, /action-skim|action-prop|action-invade/);
+  assert.doesNotMatch(html, /id=["']actions["']|action-skim|action-prop|action-invade/);
+  assert.match(app, /const ACTIONS = \['Pass','Skim','Propaganda','Invade','Sanction','Protect','Coup','FalseFlag'\]/);
+});
+
 test('JSON data files parse and contain expected shapes', () => {
   const dataDir = fromRoot('frontend', 'data');
   const files = fs.readdirSync(dataDir).filter(file => file.endsWith('.json'));

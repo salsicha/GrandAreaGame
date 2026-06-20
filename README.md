@@ -9,7 +9,7 @@ python3 -m http.server 8000
 
 
 Open http://localhost:8000
-Use "Pulse Low Happiness" to animate territories with happiness < 80, or "Pulse Invaded" after toggling an invasion with the action buttons.
+Use "Pulse Low Happiness" to animate territories with happiness < 80, or "Pulse Invaded" after resolving an invasion through the turn manager.
 
 
 Click "Shuffle Deck", "Draw Card" to draw a crisis; the card description appears and the engine will use state.crisis during resolution.
