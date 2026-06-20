@@ -16,18 +16,33 @@ async function loadJSON(path){
 async function loadMap(){
   // load default map.svg and process it
   const svgText = await fetch('map.svg').then(r=>r.text());
-  processSVG(svgText);
+  await processSVG(svgText);
 }
 
-function processSVG(svgText){
+async function processSVG(svgText){
   const container = q('map-container');
   container.innerHTML = svgText;
-  // Attach handlers to elements that either have data-country or can be mapped by id
-  document.querySelectorAll('[data-country], [id]').forEach(el=>{
-    // normalize: prefer existing data-country attribute
-    if(!el.dataset.country){
-      // leave id mapping for later (mapping.json)
-    }
+  await applyTerritoryMapping(container);
+  bindTerritoryElements(container);
+}
+
+async function applyTerritoryMapping(container){
+  try{
+    const r = await fetch('data/mapping.json');
+    if(!r.ok) return;
+    const map = await r.json();
+    const elementsById = new Map(Array.from(container.querySelectorAll('[id]')).map(el=>[el.id, el]));
+    Object.entries(map).forEach(([svgId, territoryKey])=>{
+      const el = elementsById.get(svgId);
+      if(el){ el.dataset.country = territoryKey; }
+    });
+  } catch(e){
+    // no mapping.json provided — ok
+  }
+}
+
+function bindTerritoryElements(container){
+  container.querySelectorAll('[data-country]').forEach(el=>{
     el.classList.add('territory');
     el.style.cursor = 'pointer';
     el.addEventListener('click', ()=>selectTerritory(el));
@@ -36,13 +51,6 @@ function processSVG(svgText){
     el.addEventListener('mousemove', (ev)=>{ moveTooltip(ev); });
     el.addEventListener('mouseleave', ()=>{ el.classList.remove('hovered'); hideTooltip(); });
   });
-  // try to apply mapping.json if present
-  fetch('data/mapping.json').then(r=>{ if(!r.ok) throw new Error('no mapping'); return r.json() }).then(map=>{
-    Object.entries(map).forEach(([svgId, territoryKey])=>{
-      const el = document.getElementById(svgId);
-      if(el){ el.dataset.country = territoryKey; }
-    });
-  }).catch(()=>{/* no mapping.json provided — ok */});
 }
 
 function getTooltipEl(){ return q('tooltip'); }
@@ -175,7 +183,7 @@ async function init(){
     const f = ev.target.files && ev.target.files[0];
     if(!f) return;
     const text = await f.text();
-    processSVG(text);
+    await processSVG(text);
     log(`Loaded SVG from ${f.name}`);
   });
   q('load-default').addEventListener('click', ()=>{ loadMap(); });

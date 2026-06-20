@@ -9,14 +9,14 @@ This backlog is organized around two goals:
 
 ## P0: Current Blockers
 
-- [ ] Fix the frontend startup bug where `app.js` writes to `#defiance` but `index.html` does not define that element.
-- [ ] Restrict map click/hover binding to real territory elements, not every SVG element with an `id`.
+- [x] Fix the frontend startup bug where `app.js` writes to `#defiance` but `index.html` does not define that element.
+- [x] Restrict map click/hover binding to real territory elements, not every SVG element with an `id`.
 - [ ] Stop SVG click bubbling from selecting parent groups after a territory path is clicked.
 - [ ] Normalize the data model so `family`, `type`, and `clientOf` are separate concepts.
 - [ ] Keep runtime metadata (`crisisDeck`, `hands`, `deck`, `submissions`) out of territory/player iteration.
 - [ ] Wire or remove the existing `Advance Phase`, `Reveal & Resolve`, and `Reset Round` controls.
 - [ ] Decide whether the standalone action buttons and turn-manager actions are both needed, then consolidate the UI.
-- [ ] Add a single verification command that runs JS parse checks, JSON validation, and PHP linting.
+- [x] Add a single verification command that runs JS parse checks, JSON validation, and PHP linting.
 
 ## Gameplay Enrichment
 
@@ -44,10 +44,10 @@ This backlog is organized around two goals:
 - [ ] Make all random results server-side and replayable from logged seeds or BGA-provided random APIs.
 - [ ] Replace ad hoc global frontend state with a structured state object and pure rule helpers.
 - [ ] Add unit tests for tribute, defiance, crisis effects, action resolution, cleanup, cards, and victory/loss checks.
-- [ ] Add data validation for territories, cards, crisis cards, and SVG territory mappings.
-- [ ] Add fixture-based tests that load all shipped JSON and verify every referenced id exists.
+- [x] Add data validation for territories, cards, crisis cards, and SVG territory mappings.
+- [x] Add fixture-based tests that load all shipped JSON and verify every referenced id exists.
 - [ ] Add lint/format tooling for JS, CSS, JSON, PHP, and SQL.
-- [ ] Add a README section for required local tools, including PHP installed via Homebrew.
+- [x] Add a README section for required local tools, including PHP installed via Homebrew.
 - [ ] Add a changelog or release checklist before expanding content heavily.
 
 ## BGA Integration
@@ -86,9 +86,9 @@ This backlog is organized around two goals:
 
 ## Verification Checklist
 
-- [ ] `node --check frontend/app.js`
-- [ ] `node --check frontend/rules.js`
-- [ ] JSON parse check for every file in `frontend/data/`
-- [ ] SVG/data consistency check for every `data-country` value.
-- [ ] PHP lint for every file in `bga/`.
+- [x] `node --check frontend/app.js`
+- [x] `node --check frontend/rules.js`
+- [x] JSON parse check for every file in `frontend/data/`
+- [x] SVG/data consistency check for every `data-country` value.
+- [x] PHP lint for every file in `bga/`.
 - [ ] Browser smoke test that loads `frontend/index.html`, selects a territory, runs tribute, submits actions, resolves, and verifies no console errors.

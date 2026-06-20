@@ -14,3 +14,18 @@ Use "Pulse Low Happiness" to animate territories with happiness < 80, or "Pulse 
 
 Click "Shuffle Deck", "Draw Card" to draw a crisis; the card description appears and the engine will use state.crisis during resolution.
 Use "Discard Current" to discard the active card.
+
+Development checks
+------------------
+
+Install PHP for BGA syntax checks:
+
+```bash
+brew install php
+```
+
+Run the test suite:
+
+```bash
+npm test
+```
