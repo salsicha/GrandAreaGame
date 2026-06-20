@@ -125,6 +125,16 @@ test('existing turn manager controls are wired', () => {
   assert.doesNotMatch(app, /Resolve Turn \(Phase 3 & 4\)/);
 });
 
+test('rules reference defines playable roles', () => {
+  const rules = readText('RULES.md');
+  for (const heading of ['Head Family', 'Regional Family', 'Client Family', 'Independent/Defiant State']) {
+    assert.match(rules, new RegExp(`## ${heading}`));
+  }
+  for (const field of ['`family`', '`type`', '`clientOf`', '`defiance`']) {
+    assert.ok(rules.includes(field), `missing ${field} in rules reference`);
+  }
+});
+
 test('actions are consolidated into the turn manager', () => {
   const app = readText('frontend', 'app.js');
   const html = readText('frontend', 'index.html');
@@ -370,6 +380,47 @@ test('cleanup uprising can remove a family when happiness is below stash', () =>
   assert.equal(result.newState.Alpha.family, 'Anarchy');
   assert.equal(result.newState.Alpha.wealth, 0);
   assert.equal(result.newState.Alpha.invaded, false);
+});
+
+test('asymmetric objectives award role-specific wins', () => {
+  const Rules = loadRules();
+
+  const head = Rules.evaluateObjectives({
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 300 }),
+    Clientia: territory({ family: 'Client Family', type: 'Client', clientOf: 'Head Family', defiance: 0 })
+  });
+  assert.equal(head.newState.Headland.outcome, 'Won');
+
+  const regional = Rules.evaluateObjectives({
+    Regionalia: territory({ family: 'Regional Family', type: 'Regional', clientOf: null, wealth: 260, politicalCapital: 120 })
+  });
+  assert.equal(regional.newState.Regionalia.outcome, 'Won');
+
+  const client = Rules.evaluateObjectives({
+    Clientia: territory({ family: 'Client Family', type: 'Client', defiance: 1, happiness: 120, development: 70 })
+  });
+  assert.equal(client.newState.Clientia.outcome, 'Won');
+});
+
+test('asymmetric objectives apply role-specific losses', () => {
+  const Rules = loadRules();
+
+  const head = Rules.evaluateObjectives({
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null }),
+    ClientA: territory({ family: 'Client A', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
+    ClientB: territory({ family: 'Client B', type: 'Client', clientOf: 'Head Family', defiance: 1 })
+  });
+  assert.equal(head.newState.Headland.outcome, 'Lost');
+
+  const regional = Rules.evaluateObjectives({
+    Regionalia: territory({ family: 'Regional Family', type: 'Regional', clientOf: null, happiness: 20 })
+  });
+  assert.equal(regional.newState.Regionalia.outcome, 'Lost');
+
+  const client = Rules.evaluateObjectives({
+    Clientia: territory({ family: 'Client Family', type: 'Client', wealth: 0, happiness: 80 })
+  });
+  assert.equal(client.newState.Clientia.outcome, 'Lost');
 });
 
 test('player cards apply implemented effects', () => {

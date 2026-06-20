@@ -9,6 +9,14 @@
   It's intentionally small and synchronous for use in the browser prototype.
 */
 (function(){
+  const OBJECTIVES = {
+    headWealthWin: 300,
+    regionalWealthWin: 260,
+    regionalPoliticalWin: 120,
+    clientHappinessWin: 120,
+    clientDevelopmentWin: 70
+  };
+
   function isTerritoryState(value){
     return value
       && typeof value === 'object'
@@ -27,6 +35,54 @@
   }
 
   function clamp(v, min, max){ if(v == null) return v; if(min != null) v = Math.max(min, v); if(max != null) v = Math.min(max, v); return v; }
+
+  function isEliminated(data){
+    return data.family === 'Anarchy' || data.family === 'Collapsed' || data.outcome === 'Lost';
+  }
+
+  function markOutcome(logs, key, data, outcome, reason){
+    if(data.outcome) return;
+    data.outcome = outcome;
+    logs.push(`${outcome}: ${key} - ${reason}`);
+  }
+
+  function evaluateObjectives(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+    const entries = Object.entries(newState);
+    const activeEntries = entries.filter(([, data]) => !isEliminated(data));
+    const activeClients = activeEntries.filter(([, data]) => data.type === 'Client');
+    const defiantClients = activeClients.filter(([, data]) => (data.defiance || 0) > 0);
+    const clientDefianceMajority = activeClients.length > 0 && defiantClients.length >= Math.ceil(activeClients.length / 2);
+    const allClientsCompliant = activeClients.length > 0 && defiantClients.length === 0;
+
+    entries.forEach(([key, data])=>{
+      if(data.family === 'Anarchy' || data.family === 'Collapsed'){
+        markOutcome(logs, key, data, 'Lost', 'family control collapsed');
+        return;
+      }
+
+      if(data.type === 'Head' && clientDefianceMajority){
+        markOutcome(logs, key, data, 'Lost', 'a majority of active clients are defiant');
+      } else if(data.type === 'Regional' && (data.happiness || 0) <= 20){
+        markOutcome(logs, key, data, 'Lost', 'domestic happiness collapsed');
+      } else if(data.type === 'Client' && ((data.wealth || 0) <= 0 || (data.happiness || 0) <= 0)){
+        markOutcome(logs, key, data, 'Lost', 'client wealth or happiness collapsed');
+      }
+
+      if(data.outcome === 'Lost') return;
+
+      if(data.type === 'Head' && (data.wealth || 0) >= OBJECTIVES.headWealthWin && allClientsCompliant){
+        markOutcome(logs, key, data, 'Won', 'hierarchy is stable and head wealth target is met');
+      } else if(data.type === 'Regional' && (data.wealth || 0) >= OBJECTIVES.regionalWealthWin && (data.politicalCapital || 0) >= OBJECTIVES.regionalPoliticalWin){
+        markOutcome(logs, key, data, 'Won', 'regional wealth and political power targets are met');
+      } else if(data.type === 'Client' && (data.defiance || 0) > 0 && (data.happiness || 0) >= OBJECTIVES.clientHappinessWin && (data.development || 0) >= OBJECTIVES.clientDevelopmentWin){
+        markOutcome(logs, key, data, 'Won', 'defiant client built a successful good example');
+      }
+    });
+
+    return { newState, logs };
+  }
 
   function resolveTurn(state, actions){
     const logs = [];
@@ -160,7 +216,8 @@
       }
     });
 
-    return { newState, logs };
+    const objectiveResult = evaluateObjectives(newState);
+    return { newState: objectiveResult.newState, logs: logs.concat(objectiveResult.logs) };
   }
 
   function resolveCleanup(state){
@@ -312,5 +369,5 @@
     return { newState, logs };
   }
 
-  window.Rules = { resolveTurn, resolveCleanup, resolveTribute, resolveCard };
+  window.Rules = { resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives };
 })();

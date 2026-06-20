@@ -20,8 +20,8 @@ This backlog is organized around two goals:
 
 ## Gameplay Enrichment
 
-- [ ] Define playable roles clearly: Head Family, Regional Family, Client Family, and independent/defiant state.
-- [ ] Add asymmetric win and loss conditions for head, regional, and client players.
+- [x] Define playable roles clearly: Head Family, Regional Family, Client Family, and independent/defiant state.
+- [x] Add asymmetric win and loss conditions for head, regional, and client players.
 - [ ] Implement the Ministry of Truth framing mechanic so players choose how much Social Capital/Benevolent Cover to spend on actions.
 - [ ] Expand Black Budget into a distinct hidden resource used for coups, false flags, covert influence, and deniable operations.
 - [ ] Add Defiance contagion: successful independence or high-happiness clients should pressure nearby or related clients.

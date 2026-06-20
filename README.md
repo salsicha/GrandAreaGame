@@ -3,6 +3,8 @@ GrandAreaGame
 
 Turn based strategy game based on Chomsky political theory
 
+Rules reference: [RULES.md](RULES.md)
+
 
 cd frontend
 python3 -m http.server 8000
