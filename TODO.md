@@ -36,7 +36,7 @@ This backlog is organized around two goals:
 - [x] Add negotiation hooks for tribute holidays, protection deals, client realignment, and regional-family rivalry.
 - [x] Define round timing: crisis, tribute, secret action submission, reveal, narrative battle, resolution, cleanup.
 - [x] Add deterministic tie breakers for action resolution and simultaneous effects.
-- [x] Draft a short rules reference that can be playtested without reading `GEMINI.md`.
+- [x] Draft a short rules reference that can be playtested without reading `CONCEPT.md`.
 
 ## Production Readiness
 

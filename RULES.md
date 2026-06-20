@@ -1,6 +1,6 @@
 # Grand Area Rules Reference
 
-This file defines the playable roles used by the prototype. `GEMINI.md` is the broader design notebook; this file is the shorter rules reference for implementation and playtesting.
+This file defines the playable roles used by the prototype. `CONCEPT.md` is the broader design notebook; this file is the shorter rules reference for implementation and playtesting.
 
 ## Territory Role Model
 
