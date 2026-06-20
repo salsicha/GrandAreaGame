@@ -6,6 +6,7 @@ This backlog is organized around two goals:
 
 - Enrich the gameplay so the prototype expresses the full political strategy design.
 - Move the codebase from static prototype toward a production-ready Board Game Arena implementation.
+- Prepare the game for BGA playtesting, alpha/beta review, and distribution.
 
 ## P0: Current Blockers
 
@@ -62,6 +63,27 @@ This backlog is organized around two goals:
 - [x] Add `gameinfos.inc.php`, material definitions, translations, stats, preferences, and client assets expected by BGA.
 - [x] Decide how hidden information is represented for spectators, opponents, and the active player.
 - [x] Add migration notes for syncing prototype JSON into BGA material/PHP constants.
+
+## BGA Playtest And Distribution
+
+- [ ] Confirm project eligibility and licensing before any production move; BGA requires a cleared license before a project can move to production status, including alpha.
+- [ ] Create or claim the formal BGA Studio project name that exactly matches the game name, or document any required rename for the alpha request.
+- [ ] Port this repo into the current BGA Studio file layout (`gameinfos.jsonc`, `gameoptions.jsonc`, `dbmodel.sql`, `Game.php`, `Game.js`, templates, `material.inc.php`, stats, translations, and assets).
+- [ ] Run BGA Studio local/dev checks: table creation, state transitions, commit/reveal, replay seed logging, spectator visibility, undo/replay behavior, and all player-count setups.
+- [ ] Run BGA Studio manual playtests with `dev0` through `dev9` accounts; do not ask non-developers to create Studio accounts just for testing.
+- [ ] Build a repeatable playtest script that covers realtime and turn-based games, 2/3/4/5 players, resign/zombie handling, time extensions, browser refresh, reconnect, and game end scoring.
+- [ ] Add or verify BGA-specific PHP unit tests with framework stubs for setup, legal moves/actions, state entry methods, zombie turns, scoring, and database persistence.
+- [ ] Complete the BGA pre-release checklist: metadata, game art, compressed assets, asset size limits, fonts/sounds licensing, statistics, meaningful notifications, tiebreaking, and stable database schema.
+- [ ] Test minified JS and minified CSS from the BGA management page before requesting alpha.
+- [ ] Test spectator mode, notification-log replay, full game replay after completion, Chrome/Firefox compatibility, mobile/small-screen layout, waiting screen behavior, and no stray debug logs.
+- [ ] Create BGA player resources: rules/help page, tutorial or guided first-turn notes, tooltip coverage, bug-report clarifications page, and reviewer-facing known-issues notes.
+- [ ] Build a release version in BGA Studio and verify the build log has no errors.
+- [ ] Request private alpha first if publisher/designer review should happen before broad reviewer access; include production BGA username, publisher/designer admin usernames, license or approval email, naming notes, and checklist exceptions in the alpha ticket reply.
+- [ ] If using public alpha, recruit alpha reviewers, track approvals and ratings, and triage every opened bug before requesting beta.
+- [ ] Request beta only after publisher approval and sufficient reviewer confidence; BGA recommends 10+ approvals from reviewers with rank above 3.5, or strong reception with rating around 4.5+ and no pending issues.
+- [ ] During public beta, monitor BGA bug reports daily, reproduce reports from table ids, ship fixes through Studio builds, and post release notes to the game group.
+- [ ] Before Gold/final release, ask the publisher to request official release through BGA, coordinate a launch date, prepare BGA news/group announcement copy, and freeze breaking schema/state changes.
+- [ ] Add post-release maintenance rules: avoid breaking in-progress games, add `upgradeTableDb()` for any schema migration, force-refresh clients after deploys when needed, preserve existing stat IDs, and document major changes for BGA admins.
 
 ## Frontend UX
 
