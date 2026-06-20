@@ -1,7 +1,94 @@
+# Grand Area TODO
 
-Summary of Remaining Gaps
+Updated: 2026-06-20
 
-With the Defiance Toggle implemented, the core loop (Crisis -> Tribute -> Action -> Resolution -> Cleanup) is functionally complete for a prototype. However, compared to the full GEMINI.md spec, the following are still abstract or simplified:
+This backlog is organized around two goals:
 
-"Framing" / Ministry of Truth: The design calls for a mechanic to "frame" actions to adjust costs (e.g., spending Benevolent Cover to justify an Invasion). Currently, this is hardcoded into the action logic (e.g., Invade automatically checks/deducts Social Capital). A future update could add a UI to let players choose how much Social Capital to spend to mitigate Happiness loss.
-The Black Budget: The distinction between using "Stash" vs "Political Capital" for Coups is implemented, but the specific "Black Budget" mechanic is currently just the "Stash" value.
+- Enrich the gameplay so the prototype expresses the full political strategy design.
+- Move the codebase from static prototype toward a production-ready Board Game Arena implementation.
+
+## P0: Current Blockers
+
+- [ ] Fix the frontend startup bug where `app.js` writes to `#defiance` but `index.html` does not define that element.
+- [ ] Restrict map click/hover binding to real territory elements, not every SVG element with an `id`.
+- [ ] Stop SVG click bubbling from selecting parent groups after a territory path is clicked.
+- [ ] Normalize the data model so `family`, `type`, and `clientOf` are separate concepts.
+- [ ] Keep runtime metadata (`crisisDeck`, `hands`, `deck`, `submissions`) out of territory/player iteration.
+- [ ] Wire or remove the existing `Advance Phase`, `Reveal & Resolve`, and `Reset Round` controls.
+- [ ] Decide whether the standalone action buttons and turn-manager actions are both needed, then consolidate the UI.
+- [ ] Add a single verification command that runs JS parse checks, JSON validation, and PHP linting.
+
+## Gameplay Enrichment
+
+- [ ] Define playable roles clearly: Head Family, Regional Family, Client Family, and independent/defiant state.
+- [ ] Add asymmetric win and loss conditions for head, regional, and client players.
+- [ ] Implement the Ministry of Truth framing mechanic so players choose how much Social Capital/Benevolent Cover to spend on actions.
+- [ ] Expand Black Budget into a distinct hidden resource used for coups, false flags, covert influence, and deniable operations.
+- [ ] Add Defiance contagion: successful independence or high-happiness clients should pressure nearby or related clients.
+- [ ] Add an "Example" response loop where overlords must punish or accommodate defiant clients, with consequences either way.
+- [ ] Implement resources as real constraints: oil, minerals, grain, industry, shipping, finance, and technology.
+- [ ] Make resource access affect national income, development, army upkeep, and crisis vulnerability.
+- [ ] Add national sentiment tracks: independence desire, governance-change desire, factional division, and fear.
+- [ ] Add education and development as long-term investments with political side effects.
+- [ ] Add sanctions, coups, invasions, protection offers, debt shakedowns, and economic exploitation as fully balanced actions.
+- [ ] Build a larger crisis deck with event types, targeting rules, escalation pressure, and era/context tags.
+- [ ] Expand player cards from 5 prototype cards to a balanced deck with spin, leverage, intelligence, and retaliation cards.
+- [ ] Add negotiation hooks for tribute holidays, protection deals, client realignment, and regional-family rivalry.
+- [ ] Define round timing: crisis, tribute, secret action submission, reveal, narrative battle, resolution, cleanup.
+- [ ] Add deterministic tie breakers for action resolution and simultaneous effects.
+- [ ] Draft a short rules reference that can be playtested without reading `GEMINI.md`.
+
+## Production Readiness
+
+- [ ] Move canonical game resolution to the backend; the browser should never be authoritative for production play.
+- [ ] Make all random results server-side and replayable from logged seeds or BGA-provided random APIs.
+- [ ] Replace ad hoc global frontend state with a structured state object and pure rule helpers.
+- [ ] Add unit tests for tribute, defiance, crisis effects, action resolution, cleanup, cards, and victory/loss checks.
+- [ ] Add data validation for territories, cards, crisis cards, and SVG territory mappings.
+- [ ] Add fixture-based tests that load all shipped JSON and verify every referenced id exists.
+- [ ] Add lint/format tooling for JS, CSS, JSON, PHP, and SQL.
+- [ ] Add a README section for required local tools, including PHP installed via Homebrew.
+- [ ] Add a changelog or release checklist before expanding content heavily.
+
+## BGA Integration
+
+- [ ] Replace the PHP action scaffold with the proper BGA action class/entrypoint pattern.
+- [ ] Implement `setupNewGame()` to assign players, initialize territories, build decks, and persist starting state.
+- [ ] Implement BGA state transitions for crisis, tribute, action submission, reveal, resolution, cleanup, and end game.
+- [ ] Persist secret submissions, revealed payloads, round number, phase, deck order, discard piles, and public map state.
+- [ ] Validate commit/reveal payloads against allowed actions, legal targets, current phase, and current player.
+- [ ] Use BGA-safe database escaping/query helpers instead of manual `addslashes`.
+- [ ] Add notification payloads for state changes, card draws, action reveals, combat/coup results, and cleanup events.
+- [ ] Add `gameinfos.inc.php`, material definitions, translations, stats, preferences, and client assets expected by BGA.
+- [ ] Decide how hidden information is represented for spectators, opponents, and the active player.
+- [ ] Add migration notes for syncing prototype JSON into BGA material/PHP constants.
+
+## Frontend UX
+
+- [ ] Add a clear territory panel that shows family, role, client relationship, resources, wealth, happiness, stash, capital, and defiance.
+- [ ] Show map overlays for owner, role, resource, happiness, defiance, invaded, sanctioned, and protected states.
+- [ ] Improve the action picker with legal-action filtering, target filtering, cost previews, and projected effects.
+- [ ] Add a briefcase/card UI that avoids inline HTML injection and supports hidden information cleanly.
+- [ ] Replace browser `alert`/`confirm` flow with in-app notices and confirmation dialogs.
+- [ ] Make the map and side panel usable on small screens.
+- [ ] Add accessible labels, keyboard navigation, visible focus states, and reduced-motion handling.
+- [ ] Replace inline styles with CSS classes and shared component styles.
+
+## Content And Balance
+
+- [ ] Create a larger territory set with actual world regions or countries.
+- [ ] Define starting setups for 2, 3, 4, and 5 players.
+- [ ] Establish numeric ranges for wealth, happiness, stash, social capital, political capital, education, development, resources, and armies.
+- [ ] Build a balance spreadsheet or simulation harness for repeated test games.
+- [ ] Track action economy: how many actions per player, how many cards per round, and how fast capital changes.
+- [ ] Add comeback pressure and anti-runaway mechanics for the Head Family.
+- [ ] Add client-state paths to victory that are difficult but not cosmetic.
+
+## Verification Checklist
+
+- [ ] `node --check frontend/app.js`
+- [ ] `node --check frontend/rules.js`
+- [ ] JSON parse check for every file in `frontend/data/`
+- [ ] SVG/data consistency check for every `data-country` value.
+- [ ] PHP lint for every file in `bga/`.
+- [ ] Browser smoke test that loads `frontend/index.html`, selects a territory, runs tribute, submits actions, resolves, and verifies no console errors.
