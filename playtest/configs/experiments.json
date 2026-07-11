@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "defaultExperiment": {
+    "experimentId": "qwen3.6-full-table-smoke-v1",
+    "engine": "javascript",
+    "episodeSeed": "grand-area-qwen3.6-smoke-001",
+    "maxRounds": 12,
+    "outputDir": "playtest/runs/episodes",
+    "saveTrace": true
+  }
+}

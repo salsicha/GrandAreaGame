@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grand-area-game.local/playtest/decision.schema.json",
+  "title": "Grand Area Agent Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 240
+    },
+    "plan_tags": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "string",
+        "maxLength": 40
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "rule_question": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 300
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "action_id",
+    "reason",
+    "plan_tags",
+    "confidence",
+    "rule_question"
+  ]
+}

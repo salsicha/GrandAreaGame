@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "description": "Qwen3.6 Ollama player agents for a full Grand Area automated playtest episode.",
+  "ollama": {
+    "host": "http://127.0.0.1:11434",
+    "model": "qwen3.6",
+    "temperature": 0.1,
+    "timeoutMs": 120000,
+    "maxRetries": 1,
+    "keepAlive": "30m"
+  },
+  "promptFiles": {
+    "base": "playtest/prompts/player-base.md",
+    "head": "playtest/prompts/role-head.md",
+    "regional": "playtest/prompts/role-regional.md",
+    "client": "playtest/prompts/role-client.md",
+    "optimizer": "playtest/prompts/profile-optimizer.md",
+    "novice": "playtest/prompts/profile-novice.md",
+    "exploit": "playtest/prompts/profile-exploit.md"
+  },
+  "agentProfiles": {
+    "head-qwen-optimizer": {
+      "type": "ollama",
+      "role": "Head",
+      "profile": "optimizer",
+      "model": "qwen3.6"
+    },
+    "regional-qwen-optimizer": {
+      "type": "ollama",
+      "role": "Regional",
+      "profile": "optimizer",
+      "model": "qwen3.6"
+    },
+    "client-qwen-novice": {
+      "type": "ollama",
+      "role": "Client",
+      "profile": "novice",
+      "model": "qwen3.6"
+    },
+    "client-qwen-exploit": {
+      "type": "ollama",
+      "role": "Client",
+      "profile": "exploit",
+      "model": "qwen3.6"
+    }
+  },
+  "seatAssignments": [
+    { "actor": "NorthAmerica", "agentId": "head-qwen-optimizer" },
+    { "actor": "WesternEurope", "agentId": "regional-qwen-optimizer" },
+    { "actor": "MiddleEast", "agentId": "regional-qwen-optimizer" },
+    { "actor": "SouthAsia", "agentId": "regional-qwen-optimizer" },
+    { "actor": "EastAsia", "agentId": "regional-qwen-optimizer" },
+    { "actor": "LatinAmerica", "agentId": "client-qwen-novice" },
+    { "actor": "EasternEurope", "agentId": "client-qwen-novice" },
+    { "actor": "NorthAfrica", "agentId": "client-qwen-exploit" },
+    { "actor": "SubSaharanAfrica", "agentId": "client-qwen-exploit" },
+    { "actor": "Oceania", "agentId": "client-qwen-novice" }
+  ]
+}

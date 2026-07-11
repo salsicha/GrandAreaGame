@@ -1,0 +1,10 @@
+{
+  "name": "grand-area-playtest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automated playtesting harness for Grand Area Game.",
+  "scripts": {
+    "ready": "node src/cli/ready.js",
+    "qwen": "node src/cli/run-episode.js --config configs/qwen3.6-agents.json --experiment configs/experiments.json"
+  }
+}

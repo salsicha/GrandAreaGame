@@ -107,7 +107,15 @@ function unique(values) {
 }
 
 test('frontend JavaScript parses', () => {
-  for (const file of ['frontend/app.js', 'frontend/rules.js', 'bga/client/grandareagame.js', 'tools/simulate-balance.js', 'tests/run-tests.js']) {
+  const jsFiles = [
+    'frontend/app.js',
+    'frontend/rules.js',
+    'bga/client/grandareagame.js',
+    'tools/simulate-balance.js',
+    'tests/run-tests.js',
+    ...listFilesRecursive('playtest', file => file.endsWith('.js'))
+  ];
+  for (const file of jsFiles) {
     const result = runCommand('node', ['--check', file]);
     assert.equal(result.status, 0, result.stderr || result.stdout);
   }
@@ -120,6 +128,40 @@ test('package exposes verification lint and format scripts', () => {
   assert.ok(pkg.scripts.lint, 'missing lint script');
   assert.ok(pkg.scripts['format:check'], 'missing format:check script');
   assert.equal(pkg.scripts.simulate, 'node tools/simulate-balance.js');
+  assert.equal(pkg.scripts['playtest:ready'], 'node playtest/src/cli/ready.js');
+  assert.match(pkg.scripts['playtest:qwen'], /playtest\/src\/cli\/run-episode\.js/);
+  assert.match(pkg.scripts['playtest:qwen'], /qwen3\.6-agents\.json/);
+});
+
+test('Qwen Ollama playtest harness is configured without running agents', () => {
+  const config = readJson('playtest', 'configs', 'qwen3.6-agents.json');
+  const experiments = readJson('playtest', 'configs', 'experiments.json');
+  const decisionSchema = readJson('playtest', 'schemas', 'decision.schema.json');
+  const territories = readJson('frontend', 'data', 'territories.json');
+
+  assert.equal(config.ollama.model, 'qwen3.6');
+  assert.equal(experiments.defaultExperiment.engine, 'javascript');
+  assert.equal(typeof experiments.defaultExperiment.maxRounds, 'number');
+  assert.ok(experiments.defaultExperiment.maxRounds > 0);
+  assert.ok(decisionSchema.required.includes('action_id'));
+  assert.ok(decisionSchema.required.includes('confidence'));
+
+  for (const promptPath of Object.values(config.promptFiles)) {
+    assert.ok(fs.existsSync(fromRoot(promptPath)), `missing prompt ${promptPath}`);
+    assert.ok(readText(promptPath).includes('action_id') || promptPath.includes('role-') || promptPath.includes('profile-'), `prompt ${promptPath} looks wrong`);
+  }
+
+  const assignedActors = new Set(config.seatAssignments.map(assignment => assignment.actor));
+  assert.deepEqual(Array.from(assignedActors).sort(), Object.keys(territories).sort());
+  for (const assignment of config.seatAssignments) {
+    assert.ok(config.agentProfiles[assignment.agentId], `missing profile ${assignment.agentId}`);
+  }
+});
+
+test('playtest readiness check validates engine observations and legal actions', () => {
+  const result = runCommand('node', ['playtest/src/cli/ready.js']);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Ready:/);
 });
 
 test('frontend app references defined static DOM ids', () => {
@@ -1029,6 +1071,7 @@ test('lightweight lint and format checks pass for source files', () => {
   const sourceFiles = [
     ...listFilesRecursive('frontend', file => /\.(js|css|json|svg|html)$/.test(file)),
     ...listFilesRecursive('bga', file => /\.(php|js|css|tpl|sql)$/.test(file)),
+    ...listFilesRecursive('playtest', file => /\.(js|json|md)$/.test(file)),
     ...listFilesRecursive('tools', file => /\.js$/.test(file)),
     'README.md',
     'RULES.md',

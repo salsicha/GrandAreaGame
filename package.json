@@ -7,6 +7,8 @@
     "verify": "npm test",
     "lint": "node tests/run-tests.js --lint",
     "format:check": "node tests/run-tests.js --format-check",
-    "simulate": "node tools/simulate-balance.js"
+    "simulate": "node tools/simulate-balance.js",
+    "playtest:ready": "node playtest/src/cli/ready.js",
+    "playtest:qwen": "node playtest/src/cli/run-episode.js --config playtest/configs/qwen3.6-agents.json --experiment playtest/configs/experiments.json"
   }
 }

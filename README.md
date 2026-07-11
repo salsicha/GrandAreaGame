@@ -40,6 +40,21 @@ npm run lint
 npm run format:check
 ```
 
+Automated Qwen/Ollama playtesting
+---------------------------------
+
+The playtest harness in `playtest/` is configured for Qwen3.6 agents running through local Ollama. The readiness command validates configs, prompts, legal-action enumeration, observations, and the JavaScript engine adapter without running agents:
+
+```bash
+npm run playtest:ready
+```
+
+When Ollama is running and `qwen3.6` is available locally, start one agent-driven episode:
+
+```bash
+npm run playtest:qwen
+```
+
 Production notes
 ----------------
 
