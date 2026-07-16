@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replaced the placeholder blob map with a real world map generated from Natural Earth 110m data (`tools/generate-world-map.mjs`): the ten regions are merged country geometries under the Natural Earth projection, with ocean, graticule, faint internal country borders, and haloed labels; tooltip rows gained proper spacing.
 - Fixed full-repo review findings across the engine, frontend, BGA port, playtest harness, and tests:
   - Engine: eliminated players can no longer act or collect tribute; head defiant-majority loss uses a strict majority; defiance contagion is deterministic (single snapshot wave, sorted order); collapsed defiant clients stop bleeding their overlord; tribute lapses when the overlord is gone; happiness is capped at 200 everywhere; offensive actions reject self-targets; MakeExample/Concession are overlord-only with full affordability; ClientRealignment requires a new patron; protection now deters invasion and expires with its counter; crisis cards skip eliminated targets.
   - Balance: raised win thresholds (head 360, regional 320/130, runaway 300) and rebalanced starting stats so no seat can win on round 1; compliant clients now share overlord/bloc resources, giving clients a shortage remedy and a real development path; wired the orphaned `offshore_haven` card into the deck; fixed the LatinAmerica/WesternEurope adjacency asymmetry.

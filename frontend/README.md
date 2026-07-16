@@ -13,7 +13,7 @@ This is a minimal static prototype demonstrating:
 - simple per-country state (wealth, happiness, stash)
 - turn-manager actions such as Skim, Propaganda, Invade, Sanction, Protect, Coup, and False Flag
 
-This update replaces the earlier mock map with a larger regional SVG (`map.svg`) and expands the territory metadata in `data/territories.json` to continent-level entries. Replace `map.svg` with a more detailed world SVG (for example a GeoJSON -> SVG export) and map `data/territories.json` keys to the appropriate `data-country` values inside the SVG to scale up fidelity.
+`map.svg` is a real world map generated from Natural Earth 110m data: each of the ten game regions is a merged group of countries, projected with the Natural Earth projection, with internal country borders drawn faintly inside each region. Regenerate it with `tools/generate-world-map.mjs` (see the header comment for the ad-hoc dependencies) after changing region assignments or styling.
 You can now either edit `map.svg` so each territory element contains a `data-country` attribute matching a key in `data/territories.json`, or provide a `data/mapping.json` file that maps SVG element IDs to territory keys. An example mapping file is provided as `data/mapping-example.json`.
 
 Recommended workflow to import a high-fidelity SVG:

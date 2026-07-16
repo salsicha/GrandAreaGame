@@ -60,7 +60,8 @@ button:focus-visible, select:focus-visible, input:focus-visible{outline:2px soli
 #map-container{position:relative}
 #tooltip{position:absolute;pointer-events:none;display:none;z-index:30;transform:translate(-50%, -110%);background:rgba(255,255,255,0.98);border-radius:6px;padding:8px 10px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 8px 20px rgba(0,0,0,0.08);font-size:13px;min-width:160px}
 #tooltip .title{font-weight:600;margin-bottom:6px}
-#tooltip .row{display:flex;justify-content:space-between;color:#2d3436}
+#tooltip .row{display:flex;justify-content:space-between;gap:14px;color:#2d3436}
+#tooltip .row span:first-child{color:#6b7a86}
 
 /* Legend */
 #legend{position:relative;margin-top:10px;padding:10px;border-radius:8px;background:#ffffff;border:1px solid #ececec;box-shadow:0 4px 8px rgba(0,0,0,0.03);font-size:13px}
