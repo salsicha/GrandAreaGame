@@ -10,13 +10,13 @@
 */
 (function(){
   const OBJECTIVES = {
-    headWealthWin: 300,
-    regionalWealthWin: 260,
-    regionalPoliticalWin: 120,
+    headWealthWin: 360,
+    regionalWealthWin: 320,
+    regionalPoliticalWin: 130,
     clientHappinessWin: 120,
     clientDevelopmentWin: 70,
     clientIndependenceWin: 60,
-    headRunawayWealth: 260
+    headRunawayWealth: 300
   };
 
   const ROUND_PHASES = ['Crisis','Tribute','Secret Action Submission','Reveal','Narrative Battle','Resolution','Cleanup'];
@@ -98,12 +98,24 @@
   function availableResourcesFor(key, state){
     const data = state[key];
     const resources = new Set(resourceList(data, 'resources'));
+    const isCompliantClient = data.type === 'Client' && data.clientOf && (data.defiance || 0) === 0;
     Object.keys(state).forEach(otherKey=>{
       if(otherKey === key) return;
       const other = state[otherKey];
-      if(!other || other.type !== 'Client') return;
-      if(other.clientOf !== data.family || (other.defiance || 0) > 0) return;
-      resourceList(other, 'resources').forEach(r=>resources.add(r));
+      if(!other || !isTerritoryState(other) || isEliminated(other)) return;
+      // Overlords use resources from their compliant clients.
+      if(other.type === 'Client' && other.clientOf === data.family && (other.defiance || 0) === 0){
+        resourceList(other, 'resources').forEach(r=>resources.add(r));
+      }
+      // Compliant clients use the overlord family's resources and those of
+      // compliant bloc-mates; defiance cuts a client off from the bloc pool.
+      if(isCompliantClient){
+        const isOverlordTerritory = other.family === data.clientOf;
+        const isBlocMate = other.type === 'Client' && other.clientOf === data.clientOf && (other.defiance || 0) === 0;
+        if(isOverlordTerritory || isBlocMate){
+          resourceList(other, 'resources').forEach(r=>resources.add(r));
+        }
+      }
     });
     return resources;
   }
@@ -187,8 +199,8 @@
 
   function crisisTargetKeys(crisis, state){
     const targeting = crisis.targeting || {};
-    if(crisis.target && state[crisis.target]) return [crisis.target];
-    if(targeting.territory && state[targeting.territory]) return [targeting.territory];
+    if(crisis.target && state[crisis.target] && !isEliminated(state[crisis.target])) return [crisis.target];
+    if(targeting.territory && state[targeting.territory] && !isEliminated(state[targeting.territory])) return [targeting.territory];
 
     const keys = Object.keys(state).filter(key=>isTerritoryState(state[key]) && !isEliminated(state[key]));
     switch(targeting.scope || (crisis.id === 'global_austerity' ? 'all' : 'territory')){
@@ -312,8 +324,8 @@
     const activeEntries = entries.filter(([, data]) => !isEliminated(data));
     const activeClients = activeEntries.filter(([, data]) => data.type === 'Client');
     const defiantClients = activeClients.filter(([, data]) => (data.defiance || 0) > 0);
-    const clientDefianceMajority = activeClients.length > 0 && defiantClients.length >= Math.ceil(activeClients.length / 2);
-    const allClientsCompliant = activeClients.length > 0 && defiantClients.length === 0;
+    const clientDefianceMajority = activeClients.length > 0 && defiantClients.length * 2 > activeClients.length;
+    const allClientsCompliant = defiantClients.length === 0;
 
     entries.forEach(([key, data])=>{
       if(data.family === 'Anarchy' || data.family === 'Collapsed'){
@@ -356,19 +368,25 @@
     const newState = cloneTerritories(currentState);
     const H_THRESHOLD = 120;
 
-    Object.keys(newState).forEach(sourceKey=>{
+    // Collect sources before applying any contagion so a target pushed over a
+    // threshold mid-pass never becomes a source in the same wave. Sorted keys
+    // keep the result independent of object insertion order.
+    const sourceKeys = Object.keys(newState).sort().filter(sourceKey=>{
       const orig = originalState[sourceKey] || {};
       const source = newState[sourceKey];
-      if(!source || source.type !== 'Client') return;
-
+      if(!source || source.type !== 'Client' || isEliminated(source)) return false;
       const goodExample = (orig.happiness || 0) < H_THRESHOLD && (source.happiness || 0) >= H_THRESHOLD;
       const defianceBreakout = (orig.defiance || 0) < 3 && (source.defiance || 0) >= 3;
       const successfulBreakaway = source.outcome === 'Won' && orig.outcome !== 'Won';
-      if(!goodExample && !defianceBreakout && !successfulBreakaway) return;
+      return goodExample || defianceBreakout || successfulBreakaway;
+    });
 
-      Object.keys(newState).forEach(targetKey=>{
+    sourceKeys.forEach(sourceKey=>{
+      const source = newState[sourceKey];
+      Object.keys(newState).sort().forEach(targetKey=>{
         const target = newState[targetKey];
         if(!areRelatedClients(sourceKey, source, targetKey, target)) return;
+        if(isEliminated(target)) return;
         target.defiance = (target.defiance || 0) + 1;
         logs.push(`Contagion: ${targetKey} defiance +1 due to ${sourceKey}`);
       });
@@ -391,8 +409,9 @@
     Object.keys(newState).forEach(key=>{
       const client = newState[key];
       if(!client || client.type !== 'Client' || (client.defiance || 0) <= 0) return;
+      if(isEliminated(client)) return;
       const overlord = findOverlordTerritory(newState, client);
-      if(!overlord) return;
+      if(!overlord || isEliminated(overlord)) return;
       overlord.socialCapital = clamp((overlord.socialCapital || 0) - 5, 0);
       overlord.politicalCapital = clamp((overlord.politicalCapital || 0) - 5, 0);
       logs.push(`${client.clientOf} loses 5 Social Capital and 5 Political Capital for unanswered defiance in ${key}`);
@@ -462,9 +481,9 @@
       const A = newState[actor]; const T = newState[target];
       if(!A){ logs.push(`WARN: actor ${actor} missing in state`); return; }
 
-      // Check if actor is eliminated
-      if(A.family === 'Anarchy' || A.family === 'Collapsed'){
-        logs.push(`${actor} is in ${A.family} and cannot act.`);
+      // Check if actor is eliminated (collapsed, anarchy, or marked Lost)
+      if(isEliminated(A)){
+        logs.push(`${actor} is eliminated and cannot act.`);
         return;
       }
 
@@ -477,15 +496,17 @@
         case 'Propaganda':{
           const cost = 8;
           if((A.stash||0) < cost){ logs.push(`${actor} failed Propaganda (insufficient stash)`); }
-          else { A.stash -= cost; if(T){ T.happiness = (T.happiness||0) + 10; logs.push(`${actor} spent ${cost} on propaganda for ${target}`); } }
+          else { A.stash -= cost; if(T){ T.happiness = clamp((T.happiness||0) + 10, 0, 200); logs.push(`${actor} spent ${cost} on propaganda for ${target}`); } }
           break;
         }
         case 'Invade':{
           if(T){
+            if(target === actor){ logs.push(`${actor} failed Invade (cannot target self)`); break; }
             const wealthCost = 12;
             const armyCost = 1;
             if((A.armies||0) < armyCost){ logs.push(`${actor} failed Invade (insufficient armies)`); break; }
             if((A.wealth||0) < wealthCost){ logs.push(`${actor} failed Invade (insufficient wealth)`); break; }
+            const protectedTarget = !!T.protected && T.protectedBy && T.protectedBy !== A.family;
             const framing = spendFraming(A, entry.framing, 'Invade', logs);
             const happinessLoss = Math.max(8, 25 - framing);
             const socialPenalty = Math.max(0, 15 - Math.floor(framing / 2));
@@ -502,11 +523,17 @@
             if(T.type === 'Client') T.defiance = (T.defiance||0) + 1;
             A.socialCapital = clamp((A.socialCapital||0) - socialPenalty, 0);
             logs.push(`${actor} invaded ${target}${framing > 0 ? ' with framing' : ' without framing'} (-${wealthCost} wealth, -${armyCost} army, -${happinessLoss} happiness, -${socialPenalty} backlash)`);
+            if(protectedTarget){
+              A.politicalCapital = clamp((A.politicalCapital||0) - 5, 0);
+              A.socialCapital = clamp((A.socialCapital||0) - 5, 0);
+              logs.push(`${actor} suffers extra backlash for invading protected ${target} (-5 Political Capital, -5 Social Capital)`);
+            }
           }
           break;
         }
         case 'Sanction':{
           if(!T){ logs.push(`${actor} attempted Sanction against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed Sanction (cannot target self)`); break; }
           const cost = 5;
           if((A.politicalCapital||0) < cost){ logs.push(`${actor} failed Sanction (insufficient Political Capital)`); break; }
           const loss = Math.min(18, T.wealth||0);
@@ -522,6 +549,7 @@
         }
         case 'Protect':{
           if(!T){ logs.push(`${actor} attempted Protect against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed Protect (cannot target self)`); break; }
           const stashCost = 6;
           const wealthCost = 8;
           if((A.stash||0) < stashCost){ logs.push(`${actor} failed Protect (insufficient stash)`); }
@@ -532,6 +560,7 @@
             A.politicalCapital = (A.politicalCapital||0) + 5;
             T.protected = true;
             T.protectedBy = A.family;
+            T.protectionDeal = Math.max(T.protectionDeal || 0, 2);
             T.happiness = clamp((T.happiness||0) + 8, 0, 200);
             T.fear = clamp((T.fear||0) - 5, 0, 100);
             if(T.type === 'Client' && T.clientOf && T.clientOf !== A.family){
@@ -558,6 +587,7 @@
         }
         case 'ProtectionDeal':{
           if(!T){ logs.push(`${actor} attempted ProtectionDeal against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed ProtectionDeal (cannot target self)`); break; }
           const stashCost = 4;
           const wealthCost = 6;
           if((A.stash||0) < stashCost){ logs.push(`${actor} failed ProtectionDeal (insufficient stash)`); break; }
@@ -578,7 +608,9 @@
         }
         case 'ClientRealignment':{
           if(!T){ logs.push(`${actor} attempted ClientRealignment against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed ClientRealignment (cannot target self)`); break; }
           if(T.type !== 'Client'){ logs.push(`${actor} failed ClientRealignment (${target} is not a client)`); break; }
+          if(T.clientOf === A.family){ logs.push(`${actor} failed ClientRealignment (${target} is already their client)`); break; }
           const cost = 12;
           const eligible = (T.defiance||0) > 0 || (T.independenceSentiment||0) >= 50 || (T.realignmentPressure||0) >= 8;
           if(!eligible){ logs.push(`${actor} failed ClientRealignment (${target} is not ready to realign)`); break; }
@@ -589,6 +621,7 @@
           T.clientOf = A.family;
           T.protected = true;
           T.protectedBy = A.family;
+          T.protectionDeal = Math.max(T.protectionDeal || 0, 2);
           T.realignmentPressure = 0;
           T.defiance = 0;
           T.happiness = clamp((T.happiness||0) + 4, 0, 200);
@@ -611,6 +644,7 @@
         }
         case 'DebtShakedown':{
           if(!T){ logs.push(`${actor} attempted DebtShakedown against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed DebtShakedown (cannot target self)`); break; }
           const cost = 8;
           if((A.politicalCapital||0) < cost){ logs.push(`${actor} failed DebtShakedown (insufficient Political Capital)`); break; }
           const collected = Math.min(20, T.wealth||0);
@@ -626,6 +660,7 @@
         }
         case 'EconomicExploitation':{
           if(!T){ logs.push(`${actor} attempted EconomicExploitation against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed EconomicExploitation (cannot target self)`); break; }
           const cost = 4;
           if((A.socialCapital||0) < cost){ logs.push(`${actor} failed EconomicExploitation (insufficient Social Capital)`); break; }
           const extracted = Math.min(12, T.wealth||0);
@@ -672,6 +707,7 @@
         case 'Coup':{
           // success probability depends on political capital comparison
           if(!T){ logs.push(`${actor} attempted coup against missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed Coup (cannot target self)`); break; }
           const coupCost = 10;
           if((A.blackBudget||0) < coupCost){ logs.push(`${actor} failed Coup (insufficient Black Budget)`); break; }
           A.blackBudget = (A.blackBudget||0) - coupCost;
@@ -711,6 +747,8 @@
         case 'MakeExample':{
           if(!T){ logs.push(`${actor} attempted MakeExample against missing target ${target}`); break; }
           if((T.defiance||0) <= 0){ logs.push(`${actor} failed MakeExample (${target} is not defiant)`); break; }
+          if(T.clientOf !== A.family){ logs.push(`${actor} failed MakeExample (${target} is not their client)`); break; }
+          if((A.socialCapital||0) < 10){ logs.push(`${actor} failed MakeExample (insufficient Social Capital)`); break; }
           T.defiance = 0;
           T.happiness = clamp((T.happiness||0) - 20, 0);
           A.socialCapital = clamp((A.socialCapital||0) - 10, 0);
@@ -721,13 +759,15 @@
         case 'Concession':{
           if(!T){ logs.push(`${actor} attempted Concession against missing target ${target}`); break; }
           if((T.defiance||0) <= 0){ logs.push(`${actor} failed Concession (${target} is not defiant)`); break; }
+          if(T.clientOf !== A.family){ logs.push(`${actor} failed Concession (${target} is not their client)`); break; }
           const cost = 10;
           if((A.wealth||0) < cost){ logs.push(`${actor} failed Concession (insufficient wealth)`); break; }
+          if((A.politicalCapital||0) < 5){ logs.push(`${actor} failed Concession (insufficient Political Capital)`); break; }
           A.wealth = clamp((A.wealth||0) - cost, 0);
           A.politicalCapital = clamp((A.politicalCapital||0) - 5, 0);
           A.socialCapital = (A.socialCapital||0) + 5;
           T.defiance = 0;
-          T.happiness = (T.happiness||0) + 10;
+          T.happiness = clamp((T.happiness||0) + 10, 0, 200);
           logs.push(`${actor} granted concessions to ${target} (defiance reset, happiness +10)`);
           break;
         }
@@ -735,8 +775,8 @@
       }
 
       // clamp common values
-      if(T){ T.wealth = clamp(T.wealth, 0); T.happiness = clamp(T.happiness, 0); T.debt = clamp(T.debt || 0, 0); T.defiance = Math.max(0, T.defiance || 0); }
-      A.wealth = clamp(A.wealth, 0); A.stash = clamp(A.stash, 0); A.blackBudget = clamp(A.blackBudget, 0); A.socialCapital = clamp(A.socialCapital, 0); A.politicalCapital = clamp(A.politicalCapital, 0); A.armies = clamp(A.armies, 0); A.education = clamp(A.education, 0, 150); A.development = clamp(A.development, 0, 150); A.debt = clamp(A.debt || 0, 0);
+      if(T){ T.wealth = clamp(T.wealth, 0); T.happiness = clamp(T.happiness, 0, 200); T.debt = clamp(T.debt || 0, 0); T.defiance = Math.max(0, T.defiance || 0); }
+      A.wealth = clamp(A.wealth, 0); A.stash = clamp(A.stash, 0); A.blackBudget = clamp(A.blackBudget, 0); A.socialCapital = clamp(A.socialCapital, 0); A.politicalCapital = clamp(A.politicalCapital, 0); A.armies = clamp(A.armies, 0); A.happiness = clamp(A.happiness, 0, 200); A.education = clamp(A.education, 0, 150); A.development = clamp(A.development, 0, 150); A.debt = clamp(A.debt || 0, 0);
     });
 
     const pressureResult = applyUnansweredDefiancePressure(newState);
@@ -790,7 +830,13 @@
         return;
       }
 
+      const hadProtection = (data.protectionDeal || 0) > 0;
       data.protectionDeal = Math.max(0, (data.protectionDeal || 0) - 1);
+      if(hadProtection && data.protectionDeal === 0 && data.protected){
+        data.protected = false;
+        data.protectedBy = null;
+        logs.push(`Protection expired for ${family}`);
+      }
       data.realignmentPressure = Math.max(0, (data.realignmentPressure || 0) - 1);
       data.rivalryPressure = Math.max(0, (data.rivalryPressure || 0) - 1);
 
@@ -830,7 +876,7 @@
       if(t.type === 'Head' || t.type === 'Regional') return;
 
       // Skip if eliminated
-      if(t.family === 'Anarchy' || t.family === 'Collapsed') return;
+      if(isEliminated(t)) return;
 
       // Determine who they pay (Default to 'USA' for prototype)
       const overlord = t.clientOf || 'USA';
@@ -851,21 +897,19 @@
       const amount = Math.floor((t.wealth || 0) * 0.20);
 
       if(amount > 0){
-        // Deduct from client
-        t.wealth = (t.wealth || 0) - amount;
-
-        // Add to overlord. Find a territory owned by the overlord to receive funds.
+        // Find a living territory owned by the overlord to receive funds.
         let overlordTerritory = newState[overlord]; // Try direct key match
         if(!overlordTerritory){
             const overlordKey = Object.keys(newState).find(k => newState[k] && newState[k].family === overlord);
             if(overlordKey) overlordTerritory = newState[overlordKey];
         }
 
-        if(overlordTerritory){
+        if(overlordTerritory && !isEliminated(overlordTerritory)){
+          t.wealth = (t.wealth || 0) - amount;
           overlordTerritory.wealth = (overlordTerritory.wealth || 0) + amount;
           logs.push(`💸 ${t.family} (in ${key}) pays ${amount} tribute to ${overlord}`);
         } else {
-          logs.push(`💸 ${t.family} (in ${key}) pays ${amount} tribute (Overlord ${overlord} has no territory)`);
+          logs.push(`Tribute lapses: ${t.family} (in ${key}) has no surviving overlord (${overlord})`);
         }
       }
     });
@@ -940,6 +984,7 @@
             A.politicalCapital = (A.politicalCapital||0) + 5;
             T.protected = true;
             T.protectedBy = A.family;
+            T.protectionDeal = Math.max(T.protectionDeal || 0, 2);
             T.happiness = clamp((T.happiness||0) + 6, 0, 200);
             logs.push(`${actor} signs a Protection Pact with ${target}`);
         }
@@ -1025,5 +1070,5 @@
     return { newState, logs };
   }
 
-  window.Rules = { ROUND_PHASES, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, resolveResourcePressure, resolveSentiment };
+  window.Rules = { OBJECTIVES, ROUND_PHASES, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, resolveResourcePressure, resolveSentiment, availableResourcesFor };
 })();

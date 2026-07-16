@@ -8,6 +8,7 @@
   { "id": "debt_trap", "title": "Debt Trap", "category": "leverage", "desc": "Raise target debt, lower happiness, and gain wealth.", "target": "Other" },
   { "id": "protection_pact", "title": "Protection Pact", "category": "leverage", "desc": "Protect target and gain Political Capital at stash cost.", "target": "Other" },
   { "id": "resource_contract", "title": "Resource Contract", "category": "leverage", "desc": "Extract target wealth and development through an unequal contract.", "target": "Other" },
+  { "id": "offshore_haven", "title": "Offshore Haven", "category": "leverage", "desc": "Move 20 in hidden funds into the family stash.", "target": "Self" },
 
   { "id": "false_flag", "title": "The False Flag", "category": "intelligence", "desc": "Pay Black Budget to gain Social Capital.", "target": "Self" },
   { "id": "covert_files", "title": "Covert Files", "category": "intelligence", "desc": "Expose target files to raise governance pressure and factional division.", "target": "Other" },

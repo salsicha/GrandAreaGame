@@ -4,6 +4,8 @@ This folder contains a push-button automated playtest harness based on `INSTRUCT
 
 The first implementation uses the existing deterministic JavaScript rules engine in `frontend/rules.js`, enumerates legal action IDs, gives each player agent only an observation plus legal choices, validates every selected ID, resolves the round through the authoritative engine adapter, checks invariants, and writes replayable JSON Lines episode logs.
 
+Each round the adapter draws one crisis card from a seeded shuffle of `frontend/data/crisis.json` (discarding after resolution and reshuffling the discard pile when the draw pile empties), applies it through the engine, and surfaces the drawn card in observations and recent events.
+
 ## One-time local setup
 
 Install and start Ollama, then pull the Qwen3.6 model tag you want to use:
@@ -40,7 +42,7 @@ Episode traces are written under `playtest/runs/episodes/` and are ignored by Gi
 ## Files
 
 - `configs/qwen3.6-agents.json`: Qwen3.6 Ollama agent profiles, prompt paths, and seat assignments.
-- `configs/experiments.json`: default experiment seed, max rounds, engine, and output path.
+- `configs/experiments.json`: default experiment seed, max rounds, engine, and output path. `saveTrace` controls whether full engine logs are embedded in transition records (set it to `false` for slimmer episode files).
 - `schemas/decision.schema.json`: structured JSON response schema sent to Ollama.
 - `prompts/`: shared player prompt, role prompts, and profile prompts.
 - `src/engine/jsAdapter.js`: deterministic adapter around `frontend/rules.js`.

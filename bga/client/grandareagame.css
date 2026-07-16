@@ -16,6 +16,23 @@
   font-weight: 600;
 }
 
+#grandarea_log {
+  margin-top: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.grandarea-log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid #eee;
+}
+
+#grandarea_endturn {
+  margin: 8px 0;
+  display: inline-block;
+}
+
 @media (max-width: 720px) {
   #grandarea_table {
     grid-template-columns: 1fr;

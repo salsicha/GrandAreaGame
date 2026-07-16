@@ -148,7 +148,11 @@ test('Qwen Ollama playtest harness is configured without running agents', () => 
 
   for (const promptPath of Object.values(config.promptFiles)) {
     assert.ok(fs.existsSync(fromRoot(promptPath)), `missing prompt ${promptPath}`);
-    assert.ok(readText(promptPath).includes('action_id') || promptPath.includes('role-') || promptPath.includes('profile-'), `prompt ${promptPath} looks wrong`);
+    const promptText = readText(promptPath);
+    assert.ok(promptText.trim().length >= 80, `prompt ${promptPath} is too short to be real guidance`);
+    if (promptPath.includes('player-base')) {
+      assert.ok(promptText.includes('action_id'), `prompt ${promptPath} must describe the decision contract`);
+    }
   }
 
   const assignedActors = new Set(config.seatAssignments.map(assignment => assignment.actor));
@@ -781,6 +785,16 @@ test('balance simulation harness runs deterministic sample games', () => {
   assert.equal(result.rounds, 2);
   assert.equal(result.seed, 'test-seed');
   assert.equal(typeof result.totals.wealth, 'number');
+  assert.equal(typeof result.roundsPlayed, 'number');
+  assert.ok(result.roundsPlayed >= 1);
+  assert.ok(Array.isArray(result.winners));
+  assert.ok(Array.isArray(result.crisesDrawn));
+  assert.ok(result.crisesDrawn.length >= 1, 'expected at least one crisis draw');
+  for (const role of ['Head', 'Regional', 'Client']) {
+    for (const outcome of ['won', 'lost', 'collapsed', 'active']) {
+      assert.equal(typeof result.outcomesByRole[role][outcome], 'number', `outcomesByRole.${role}.${outcome}`);
+    }
+  }
 });
 
 test('coup success and failure are deterministic when random is controlled', () => {
@@ -975,7 +989,7 @@ test('education changes sentiment based on happiness and client status', () => {
 test('head runaway wealth creates comeback pressure', () => {
   const Rules = loadRules();
   const state = {
-    NorthAmerica: territory({ family: 'USA', type: 'Head', clientOf: null, wealth: 270, socialCapital: 80 }),
+    NorthAmerica: territory({ family: 'USA', type: 'Head', clientOf: null, wealth: 310, socialCapital: 80 }),
     LatinAmerica: territory({ family: 'Latin Client Coalition', type: 'Client', clientOf: 'USA', defiance: 0, independenceSentiment: 40 }),
     EastAsia: territory({ family: 'China', type: 'Regional', clientOf: null, politicalCapital: 90, rivalryPressure: 0 })
   };
@@ -992,13 +1006,13 @@ test('asymmetric objectives award role-specific wins', () => {
   const Rules = loadRules();
 
   const head = Rules.evaluateObjectives({
-    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 300 }),
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 360 }),
     Clientia: territory({ family: 'Client Family', type: 'Client', clientOf: 'Head Family', defiance: 0 })
   });
   assert.equal(head.newState.Headland.outcome, 'Won');
 
   const regional = Rules.evaluateObjectives({
-    Regionalia: territory({ family: 'Regional Family', type: 'Regional', clientOf: null, wealth: 260, politicalCapital: 120 })
+    Regionalia: territory({ family: 'Regional Family', type: 'Regional', clientOf: null, wealth: 320, politicalCapital: 130 })
   });
   assert.equal(regional.newState.Regionalia.outcome, 'Won');
 
@@ -1054,6 +1068,212 @@ test('player cards apply implemented effects', () => {
   assert.equal(Rules.resolveCard(baseState, 'offshore_haven', 'Alpha', 'Alpha').newState.Alpha.stash, 40);
 });
 
+test('eliminated actors cannot act', () => {
+  const Rules = loadRules();
+  const state = {
+    Alpha: territory({ family: 'AlphaFamily', type: 'Head', clientOf: null, outcome: 'Lost', politicalCapital: 50, wealth: 100 }),
+    Beta: territory({ family: 'BetaFamily', wealth: 50 })
+  };
+
+  const result = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Sanction', target: 'Beta' }]);
+  assert.equal(result.newState.Beta.wealth, 50);
+  assert.ok(result.logs.some(line => line.includes('eliminated and cannot act')));
+});
+
+test('head loses only to a strict majority of defiant clients', () => {
+  const Rules = loadRules();
+  const base = {
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null }),
+    C1: territory({ family: 'C1 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
+    C2: territory({ family: 'C2 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
+    C3: territory({ family: 'C3 Family', type: 'Client', clientOf: 'Head Family', defiance: 0 }),
+    C4: territory({ family: 'C4 Family', type: 'Client', clientOf: 'Head Family', defiance: 0 })
+  };
+
+  const half = Rules.evaluateObjectives(base);
+  assert.notEqual(half.newState.Headland.outcome, 'Lost');
+
+  const majority = Rules.evaluateObjectives({
+    ...base,
+    C3: territory({ family: 'C3 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 })
+  });
+  assert.equal(majority.newState.Headland.outcome, 'Lost');
+});
+
+test('an eliminated defiant client stops bleeding its overlord', () => {
+  const Rules = loadRules();
+  const state = {
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, socialCapital: 40, politicalCapital: 40 }),
+    Ruins: territory({ family: 'Anarchy', type: 'Client', clientOf: 'USA', defiance: 2 })
+  };
+
+  const result = Rules.applyUnansweredDefiancePressure(state);
+  assert.equal(result.newState.USA.socialCapital, 40);
+  assert.equal(result.newState.USA.politicalCapital, 40);
+});
+
+test('offensive actions cannot target self', () => {
+  const Rules = loadRules();
+  const state = {
+    Alpha: territory({ family: 'AlphaFamily', wealth: 100, armies: 2, blackBudget: 20, politicalCapital: 50 })
+  };
+
+  const invade = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Invade', target: 'Alpha' }]);
+  assert.equal(invade.newState.Alpha.invaded, false);
+  assert.ok(invade.logs.some(line => line.includes('failed Invade (cannot target self)')));
+
+  const coup = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Coup', target: 'Self' }]);
+  assert.equal(coup.newState.Alpha.blackBudget, 20);
+  assert.ok(coup.logs.some(line => line.includes('failed Coup (cannot target self)')));
+});
+
+test('defiance responses are restricted to the overlord', () => {
+  const Rules = loadRules();
+  const state = {
+    Meddler: territory({ family: 'Meddler Family', type: 'Regional', clientOf: null, socialCapital: 50, politicalCapital: 50 }),
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, socialCapital: 50, politicalCapital: 50 }),
+    Clientia: territory({ family: 'Clientia', type: 'Client', clientOf: 'USA', defiance: 1, happiness: 100 })
+  };
+
+  const result = Rules.resolveTurn(state, [{ family: 'Meddler', action: 'MakeExample', target: 'Clientia' }]);
+  assert.equal(result.newState.Clientia.defiance, 1);
+  assert.equal(result.newState.Clientia.happiness, 100);
+  assert.equal(result.newState.Meddler.politicalCapital, 50);
+  assert.ok(result.logs.some(line => line.includes('failed MakeExample (Clientia is not their client)')));
+});
+
+test('an overlord cannot realign its own client to launder defiance', () => {
+  const Rules = loadRules();
+  const state = {
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, politicalCapital: 50, socialCapital: 50 }),
+    Clientia: territory({ family: 'Clientia', type: 'Client', clientOf: 'USA', defiance: 2 })
+  };
+
+  const result = Rules.resolveTurn(state, [{ family: 'USA', action: 'ClientRealignment', target: 'Clientia' }]);
+  assert.equal(result.newState.Clientia.defiance, 2);
+  assert.equal(result.newState.Clientia.clientOf, 'USA');
+  assert.ok(result.logs.some(line => line.includes('failed ClientRealignment (Clientia is already their client)')));
+});
+
+test('happiness is capped at 200', () => {
+  const Rules = loadRules();
+  const propaganda = Rules.resolveTurn({
+    Alpha: territory({ stash: 20, happiness: 195, defiance: 0 })
+  }, [{ family: 'Alpha', action: 'Propaganda', target: 'Self' }]);
+  assert.equal(propaganda.newState.Alpha.happiness, 200);
+
+  const concession = Rules.resolveTurn({
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, wealth: 100, politicalCapital: 50, socialCapital: 50 }),
+    Clientia: territory({ family: 'Clientia', type: 'Client', clientOf: 'USA', defiance: 1, happiness: 198 })
+  }, [{ family: 'USA', action: 'Concession', target: 'Clientia' }]);
+  assert.equal(concession.newState.Clientia.happiness, 200);
+});
+
+test('defiance contagion is independent of territory key order', () => {
+  const Rules = loadRules();
+  const build = order => {
+    const src = {
+      Spark: territory({ family: 'Spark Family', type: 'Client', clientOf: 'USA', defiance: 3, neighbors: ['Mid'] }),
+      Mid: territory({ family: 'Mid Family', type: 'Client', clientOf: 'EU', defiance: 2, neighbors: ['Spark', 'Far'] }),
+      Far: territory({ family: 'Far Family', type: 'Client', clientOf: 'China', defiance: 0, neighbors: ['Mid'] })
+    };
+    const out = {};
+    order.forEach(key => { out[key] = src[key]; });
+    return out;
+  };
+  const original = {
+    Spark: { defiance: 2, happiness: 100 },
+    Mid: { defiance: 2, happiness: 100 },
+    Far: { defiance: 0, happiness: 100 }
+  };
+
+  const forward = Rules.applyDefianceContagion(build(['Spark', 'Mid', 'Far']), original);
+  const reversed = Rules.applyDefianceContagion(build(['Far', 'Mid', 'Spark']), original);
+  assert.equal(forward.newState.Mid.defiance, reversed.newState.Mid.defiance);
+  assert.equal(forward.newState.Far.defiance, reversed.newState.Far.defiance);
+  assert.equal(forward.newState.Mid.defiance, 3);
+  assert.equal(forward.newState.Far.defiance, 0);
+});
+
+test('tribute lapses when the overlord has no surviving territory', () => {
+  const Rules = loadRules();
+  const state = {
+    Ruins: territory({ family: 'Collapsed', type: 'Head', clientOf: null, wealth: 0 }),
+    Clientia: territory({ family: 'Clientia', type: 'Client', clientOf: 'USA', wealth: 50 })
+  };
+
+  const result = Rules.resolveTribute(state);
+  assert.equal(result.newState.Clientia.wealth, 50);
+  assert.ok(result.logs.some(line => line.includes('Tribute lapses')));
+});
+
+test('protection deters invasion and expires with the deal counter', () => {
+  const Rules = loadRules();
+  const deter = Rules.resolveTurn({
+    Aggressor: territory({ family: 'Aggressor Family', wealth: 100, armies: 2, socialCapital: 50, politicalCapital: 50 }),
+    Shielded: territory({ family: 'Shielded Family', happiness: 80, protected: true, protectedBy: 'Guardian Family' })
+  }, [{ family: 'Aggressor', action: 'Invade', target: 'Shielded' }]);
+  assert.equal(deter.newState.Aggressor.socialCapital, 30);
+  assert.equal(deter.newState.Aggressor.politicalCapital, 50);
+  assert.ok(deter.logs.some(line => line.includes('extra backlash for invading protected')));
+
+  const expiring = Rules.resolveCleanup({
+    Sheltered: territory({ family: 'Sheltered Family', protectionDeal: 1, protected: true, protectedBy: 'Guardian Family', happiness: 100, stash: 20 })
+  });
+  assert.equal(expiring.newState.Sheltered.protected, false);
+  assert.equal(expiring.newState.Sheltered.protectedBy, null);
+  assert.ok(expiring.logs.some(line => line.includes('Protection expired')));
+});
+
+test('compliant clients use overlord and bloc-mate resources', () => {
+  const Rules = loadRules();
+  const compliant = {
+    Patron: territory({ family: 'Patronia', type: 'Regional', clientOf: null, resources: ['Industry'] }),
+    Little: territory({ family: 'Little Family', type: 'Client', clientOf: 'Patronia', resources: [], resourceNeeds: ['Industry', 'Grain'], defiance: 0, wealth: 100 }),
+    Sibling: territory({ family: 'Sibling Family', type: 'Client', clientOf: 'Patronia', resources: ['Grain'], defiance: 0 })
+  };
+  const shared = Rules.resolveResourcePressure(compliant);
+  assert.equal(shared.newState.Little.wealth, 100);
+
+  const defiant = {
+    ...compliant,
+    Little: territory({ family: 'Little Family', type: 'Client', clientOf: 'Patronia', resources: [], resourceNeeds: ['Industry', 'Grain'], defiance: 1, wealth: 100 })
+  };
+  const cutOff = Rules.resolveResourcePressure(defiant);
+  assert.equal(cutOff.newState.Little.wealth, 90);
+});
+
+test('no seat can win on the first round from the starting setup', () => {
+  const Rules = loadRules();
+  const territories = readJson('frontend', 'data', 'territories.json');
+  const objectives = Rules.OBJECTIVES;
+
+  const tribute = Rules.resolveTribute(territories);
+  const evaluated = Rules.evaluateObjectives(tribute.newState);
+  for (const [key, data] of Object.entries(evaluated.newState)) {
+    assert.notEqual(data.outcome, 'Won', `${key} can win from setup plus one tribute phase`);
+  }
+
+  const maxSingleActionPoliticalGain = 10;
+  for (const [key, data] of Object.entries(tribute.newState)) {
+    if (data.type === 'Regional') {
+      assert.ok(
+        data.wealth < objectives.regionalWealthWin || data.politicalCapital + maxSingleActionPoliticalGain < objectives.regionalPoliticalWin,
+        `${key} is within one action of the regional win`
+      );
+    }
+    if (data.type === 'Head') {
+      assert.ok(data.wealth + 25 < objectives.headWealthWin, `${key} is within one action of the head wealth win`);
+    }
+    if (data.type === 'Client') {
+      assert.ok(
+        data.happiness + 15 < objectives.clientHappinessWin || data.development + 10 < objectives.clientDevelopmentWin,
+        `${key} is within one action of the client win`
+      );
+    }
+  }
+});
+
 if (commandExists('php')) {
   test('BGA PHP files pass syntax lint', () => {
     const phpFiles = listFilesRecursive('bga', file => file.endsWith('.php'));
@@ -1106,24 +1326,49 @@ test('lightweight lint and format checks pass for source files', () => {
   assert.match(bgaGame, /setupNewGame/);
 });
 
-let failed = 0;
-for (const { name, fn } of tests) {
-  try {
-    fn();
-    console.log(`[PASS] ${name}`);
-  } catch (error) {
-    failed += 1;
-    console.error(`[FAIL] ${name}`);
-    console.error(error && error.stack ? error.stack : error);
+const cliArgs = process.argv.slice(2);
+const formatOnly = cliArgs.includes('--format-check');
+const lintOnly = !formatOnly && cliArgs.includes('--lint');
+
+const LINT_TEST_NAMES = new Set([
+  'frontend JavaScript parses',
+  'BGA PHP files pass syntax lint',
+  'lightweight lint and format checks pass for source files'
+]);
+const FORMAT_TEST_NAMES = new Set([
+  'lightweight lint and format checks pass for source files'
+]);
+
+let selected = tests;
+if (formatOnly) {
+  selected = tests.filter(entry => FORMAT_TEST_NAMES.has(entry.name));
+} else if (lintOnly) {
+  selected = tests.filter(entry => LINT_TEST_NAMES.has(entry.name));
+}
+
+(async () => {
+  let failed = 0;
+  for (const { name, fn } of selected) {
+    try {
+      await fn();
+      console.log(`[PASS] ${name}`);
+    } catch (error) {
+      failed += 1;
+      console.error(`[FAIL] ${name}`);
+      console.error(error && error.stack ? error.stack : error);
+    }
   }
-}
 
-for (const { name, reason } of skips) {
-  console.log(`[SKIP] ${name} (${reason})`);
-}
+  if (!lintOnly && !formatOnly) {
+    for (const { name, reason } of skips) {
+      console.log(`[SKIP] ${name} (${reason})`);
+    }
+  }
 
-console.log(`\n${tests.length - failed}/${tests.length} tests passed, ${skips.length} skipped.`);
+  const mode = formatOnly ? ' (format-check mode)' : lintOnly ? ' (lint mode)' : '';
+  console.log(`\n${selected.length - failed}/${selected.length} tests passed${mode}, ${lintOnly || formatOnly ? 0 : skips.length} skipped.`);
 
-if (failed > 0) {
-  process.exit(1);
-}
+  if (failed > 0) {
+    process.exitCode = 1;
+  }
+})();

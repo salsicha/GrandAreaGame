@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS player_state (
 
 CREATE TABLE IF NOT EXISTS secret_submissions (
   game_id INT NOT NULL,
+  round_number INT NOT NULL DEFAULT 0,
   player_id INT NOT NULL,
   commit_hash VARCHAR(128) NOT NULL,
   submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,

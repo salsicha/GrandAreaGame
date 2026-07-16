@@ -31,9 +31,22 @@ function scoreAction(action, role, features) {
     if (['Develop', 'RegionalRivalry', 'ProtectionDeal', 'ClientRealignment'].includes(action.type)) score += 4;
     if (action.type === 'Skim' && features.wealthToVictory <= 60) score += 2;
   } else {
-    if (action.type === 'Develop') score += features.developmentToVictory > 0 ? 5 : 1;
-    if (action.type === 'Educate') score += features.independenceToVictory > 0 ? 4 : 1;
-    if (action.type === 'Propaganda') score += features.happinessToVictory > 0 ? 3 : 1;
+    // Client independence path: build development/education/happiness while
+    // compliant, flip to deliberate defiance via self-CovertInfluence once the
+    // happiness and development thresholds are close, then stay alive.
+    const nearThresholds = features.happinessToVictory <= 15 && features.developmentToVictory <= 15;
+    if (!features.defiant && nearThresholds && action.type === 'CovertInfluence' && action.target === 'Self') {
+      score += 8;
+    }
+    if (features.defiant) {
+      if (action.type === 'Propaganda' && action.target === 'Self') score += features.happinessToVictory > 0 ? 6 : 2;
+      if (action.type === 'Develop') score += features.developmentToVictory > 0 ? 5 : 1;
+      if (action.type === 'Educate') score += features.independenceToVictory > 0 ? 4 : 1;
+    } else {
+      if (action.type === 'Develop') score += features.developmentToVictory > 0 ? 5 : 1;
+      if (action.type === 'Educate') score += features.independenceToVictory > 0 ? 4 : 1;
+      if (action.type === 'Propaganda') score += features.happinessToVictory > 0 ? 3 : 1;
+    }
   }
   if (action.tags.includes('covert')) score += 0.5;
   if (action.parameters && action.parameters.framing > 0) score -= 0.1 * action.parameters.framing;

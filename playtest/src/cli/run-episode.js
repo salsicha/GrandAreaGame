@@ -1,10 +1,11 @@
 #!/usr/bin/env node
+const fs = require('node:fs');
 const path = require('node:path');
 const { OllamaAgent, buildOllamaAgentFromConfig } = require('../agents/ollamaAgent');
 const { JavaScriptGameAdapter } = require('../engine/jsAdapter');
 const { JsonlEpisodeLogger } = require('../runner/episodeLogger');
 const { runEpisode } = require('../runner/episodeRunner');
-const { readJson, repoRoot } = require('../util/files');
+const { fromRepo } = require('../util/files');
 
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -12,12 +13,20 @@ function argValue(name, fallback) {
   return process.argv[index + 1];
 }
 
+// Relative --config/--experiment paths resolve against the caller's working
+// directory, so both `npm run playtest:qwen` (repo root) and `npm run qwen`
+// (playtest/) work. Defaults are absolute repo paths.
+function loadJson(filePath) {
+  return JSON.parse(fs.readFileSync(path.resolve(process.cwd(), filePath), 'utf8'));
+}
+
 async function main() {
-  const configPath = argValue('--config', 'playtest/configs/qwen3.6-agents.json');
-  const experimentPath = argValue('--experiment', 'playtest/configs/experiments.json');
-  const config = readJson(path.relative(repoRoot, path.resolve(repoRoot, configPath)));
-  const experiments = readJson(path.relative(repoRoot, path.resolve(repoRoot, experimentPath)));
+  const configPath = argValue('--config', fromRepo('playtest', 'configs', 'qwen3.6-agents.json'));
+  const experimentPath = argValue('--experiment', fromRepo('playtest', 'configs', 'experiments.json'));
+  const config = loadJson(configPath);
+  const experiments = loadJson(experimentPath);
   const experiment = experiments.defaultExperiment;
+  if (!experiment) throw new Error(`Experiment config ${experimentPath} is missing defaultExperiment`);
   const adapter = new JavaScriptGameAdapter({ maxRounds: experiment.maxRounds });
   const agents = new Map();
 
@@ -32,12 +41,20 @@ async function main() {
 
   const episodeId = `${experiment.experimentId}-${Date.now()}`;
   const logger = new JsonlEpisodeLogger(experiment.outputDir, episodeId);
-  const result = await runEpisode(adapter, experiment, agents, logger, {
-    experimentId: experiment.experimentId,
-    engine: experiment.engine,
-    agentConfig: configPath,
-    model: process.env.GRANDAREA_OLLAMA_MODEL || config.ollama.model
-  });
+  let result;
+  try {
+    result = await runEpisode(adapter, experiment, agents, logger, {
+      experimentId: experiment.experimentId,
+      engine: experiment.engine,
+      agentConfig: configPath,
+      model: process.env.GRANDAREA_OLLAMA_MODEL || config.ollama.model
+    });
+  } catch (error) {
+    // Flush and close the JSONL stream before exiting so partial episodes
+    // are not truncated mid-line.
+    await logger.close();
+    throw error;
+  }
 
   console.log(JSON.stringify({
     episodeId,

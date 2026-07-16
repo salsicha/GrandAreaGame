@@ -57,6 +57,10 @@ function postJson(urlString, payload, timeoutMs) {
   });
 }
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function renderTurnPrompt(input, profilePrompt, rolePrompt, correction) {
   return [
     'PLAYER_PROFILE',
@@ -91,6 +95,7 @@ class OllamaAgent {
     this.temperature = options.temperature == null ? 0.1 : options.temperature;
     this.timeoutMs = options.timeoutMs || 120000;
     this.maxRetries = options.maxRetries == null ? 1 : options.maxRetries;
+    this.retryBackoffMs = options.retryBackoffMs == null ? 500 : options.retryBackoffMs;
     this.keepAlive = options.keepAlive || '30m';
     this.systemPrompt = options.systemPrompt;
     this.rolePrompt = options.rolePrompt;
@@ -100,50 +105,97 @@ class OllamaAgent {
 
   async choose(input) {
     let correction = '';
-    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
-      const response = await postJson(`${this.host.replace(/\/$/, '')}/api/chat`, {
-        model: this.model,
-        stream: false,
-        keep_alive: this.keepAlive,
-        format: this.decisionSchema,
-        options: {
-          temperature: this.temperature
-        },
-        messages: [
-          { role: 'system', content: this.systemPrompt },
-          { role: 'user', content: renderTurnPrompt(input, this.profilePrompt, this.rolePrompt, correction) }
-        ]
-      }, this.timeoutMs);
+    let failureReason = null;
+    let parsed = false;
+    let schemaValid = false;
+    let legal = false;
+    let attempts = 0;
 
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      attempts = attempt + 1;
+      if (attempt > 0 && this.retryBackoffMs > 0) await delay(this.retryBackoffMs * attempt);
+
+      let response;
       try {
-        const rawContent = response.message && response.message.content;
-        const parsed = validateDecisionShape(JSON.parse(rawContent));
-        if (!input.legalActions.some(action => action.id === parsed.action_id)) {
-          correction = `Previous action_id "${parsed.action_id}" was not listed in LEGAL_ACTIONS. Return one exact listed ID.`;
-          continue;
-        }
-        return {
-          actionId: parsed.action_id,
-          confidence: parsed.confidence,
-          reason: parsed.reason,
-          tags: parsed.plan_tags,
-          ruleQuestion: parsed.rule_question,
-          rawResponse: rawContent,
-          fallbackUsed: false
-        };
+        response = await postJson(`${this.host.replace(/\/$/, '')}/api/chat`, {
+          model: this.model,
+          stream: false,
+          keep_alive: this.keepAlive,
+          format: this.decisionSchema,
+          options: {
+            temperature: this.temperature
+          },
+          messages: [
+            { role: 'system', content: this.systemPrompt },
+            { role: 'user', content: renderTurnPrompt(input, this.profilePrompt, this.rolePrompt, correction) }
+          ]
+        }, this.timeoutMs);
       } catch (error) {
-        correction = `Previous response failed JSON/schema validation: ${error.message}. Return only valid JSON.`;
+        // Transport failures (connection refused, timeout, HTTP 5xx) are
+        // retried with backoff and never abort the episode.
+        parsed = false;
+        schemaValid = false;
+        legal = false;
+        failureReason = `transport: ${error.message}`;
+        continue;
       }
+
+      parsed = false;
+      schemaValid = false;
+      legal = false;
+      const rawContent = response.message && response.message.content;
+      let candidate;
+      try {
+        candidate = JSON.parse(rawContent);
+        parsed = true;
+        validateDecisionShape(candidate);
+        schemaValid = true;
+      } catch (error) {
+        failureReason = `${parsed ? 'schema' : 'parse'}: ${error.message}`;
+        correction = `Previous response failed JSON/schema validation: ${error.message}. Return only valid JSON.`;
+        continue;
+      }
+      if (!input.legalActions.some(action => action.id === candidate.action_id)) {
+        failureReason = `illegal-action: ${candidate.action_id}`;
+        correction = `Previous action_id "${candidate.action_id}" was not listed in LEGAL_ACTIONS. Return one exact listed ID.`;
+        continue;
+      }
+      legal = true;
+      return {
+        actionId: candidate.action_id,
+        confidence: candidate.confidence,
+        reason: candidate.reason,
+        tags: candidate.plan_tags,
+        ruleQuestion: candidate.rule_question,
+        rawResponse: rawContent,
+        fallbackUsed: false,
+        validation: {
+          parsed: true,
+          schemaValid: true,
+          legal: true,
+          fallbackUsed: false,
+          reason: null,
+          attempts
+        }
+      };
     }
 
     const fallback = chooseHeuristicAction(input.legalActions, input.observation);
     return {
       actionId: fallback.id,
       confidence: 0,
-      reason: 'Heuristic fallback after invalid model output.',
+      reason: 'Heuristic fallback after model failure.',
       tags: ['model-fallback'],
       ruleQuestion: null,
-      fallbackUsed: true
+      fallbackUsed: true,
+      validation: {
+        parsed,
+        schemaValid,
+        legal,
+        fallbackUsed: true,
+        reason: failureReason,
+        attempts
+      }
     };
   }
 }
@@ -158,6 +210,7 @@ function buildOllamaAgentFromConfig(agentId, profile, config) {
     temperature: config.ollama.temperature,
     timeoutMs: config.ollama.timeoutMs,
     maxRetries: config.ollama.maxRetries,
+    retryBackoffMs: config.ollama.retryBackoffMs,
     keepAlive: config.ollama.keepAlive,
     systemPrompt: readText(prompts.base),
     rolePrompt: readText(prompts[roleKey]),

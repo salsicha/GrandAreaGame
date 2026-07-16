@@ -151,6 +151,7 @@ function hideTooltip(){ const t = getTooltipEl(); if(t){ t.style.display='none';
 
 function updatePanel(country){
   const data = state[country];
+  if(!data){ notify(`No territory data for ${country}.`, 'error'); return; }
   q('country-name').textContent = country;
   const el = document.querySelector(`[data-country="${country}"]`);
   const famName = el ? el.dataset.family || data.family : data.family;
@@ -268,6 +269,8 @@ async function init(){
   try{ const crisis = await loadJSON('data/crisis.json'); gameState.runtime.crisisDeck = { drawPile: crisis.slice(), discard: [] }; } catch(e){ gameState.runtime.crisisDeck = { drawPile: [], discard: [] }; }
   // load player cards
   try{ gameState.runtime.cardDefs = await loadJSON('data/playercards.json'); } catch(e){ gameState.runtime.cardDefs=[]; }
+  // load balance knobs (hand limit etc.)
+  try{ gameState.runtime.balance = await loadJSON('data/balance.json'); } catch(e){ gameState.runtime.balance = null; }
   initDeck();
 
   await loadMap();
@@ -342,6 +345,8 @@ function shuffleDeck(){
 function drawCard(){
   const deck = gameState.runtime.crisisDeck;
   if(!deck || deck.drawPile.length === 0){ log('No cards to draw'); return; }
+  // retire any current card to the discard pile so it is never lost
+  if(deck.current){ deck.discard.push(deck.current); }
   const card = deck.drawPile.shift();
   deck.current = card;
   // apply to state so rules engine can use it
@@ -389,14 +394,23 @@ function initDeck(){
 }
 
 function dealRoundCards(){
-  // Deal 1 card to every valid family
+  // Deal 1 card to every valid family, respecting the hand limit
+  const balance = gameState.runtime.balance;
+  const maxHand = (balance && balance.actionEconomy && balance.actionEconomy.maxCardsInHand) || 5;
+  let dealt = 0, atLimit = 0, starved = 0;
   territoryKeys().forEach(k => {
     if(state[k] && state[k].family && state[k].family !== 'Anarchy' && state[k].family !== 'Collapsed'){
       if(!gameState.runtime.hands[k]) gameState.runtime.hands[k] = [];
-      if(gameState.runtime.deck.length > 0) gameState.runtime.hands[k].push(gameState.runtime.deck.pop());
+      if(gameState.runtime.hands[k].length >= maxHand){ atLimit += 1; return; }
+      if(gameState.runtime.deck.length === 0){ starved += 1; return; }
+      gameState.runtime.hands[k].push(gameState.runtime.deck.pop());
+      dealt += 1;
     }
   });
-  log('Dealt 1 card to all families.');
+  const notes = [];
+  if(atLimit) notes.push(`${atLimit} at hand limit`);
+  if(starved) notes.push(`deck empty for ${starved}`);
+  log(`Dealt ${dealt} card${dealt === 1 ? '' : 's'}${notes.length ? ` (${notes.join(', ')})` : ''}.`);
   renderBriefcase();
 }
 
@@ -415,7 +429,7 @@ function playCard(family, cardId, target){
   if(idx > -1) gameState.runtime.hands[family].splice(idx, 1);
 
   result.logs.forEach(l => log(l));
-  renderBriefcase();
+  renderPlayersList();
   if(gameState.ui.selected) updatePanel(gameState.ui.selected);
   applyOverlay();
 }
@@ -481,24 +495,24 @@ const ACTION_RULES = {
   Propaganda: { target: 'any', cost: '8 stash', effect: 'Target happiness +10.' },
   Invade: { target: 'other', cost: '12 wealth, 1 army, backlash', effect: 'Target invaded, wealth -10, happiness loss, fear +10.' },
   Sanction: { target: 'other', cost: '5 Political Capital', effect: 'Target wealth, happiness, and development fall.' },
-  Protect: { target: 'any', cost: '8 wealth, 6 stash', effect: 'Target protected, happiness +8, fear reduced.' },
+  Protect: { target: 'other', cost: '8 wealth, 6 stash', effect: 'Target protected, happiness +8, fear reduced.' },
   TributeHoliday: { target: 'controlledClient', cost: '8 wealth', effect: 'Client skips one tribute and loses 1 defiance.' },
-  ProtectionDeal: { target: 'any', cost: '6 wealth, 4 stash', effect: 'Temporary protection; rival clients gain realignment pressure.' },
-  ClientRealignment: { target: 'client', cost: '12 Political Capital, 4 Social Capital', effect: 'Eligible client switches patron.' },
+  ProtectionDeal: { target: 'other', cost: '6 wealth, 4 stash', effect: 'Temporary protection; rival clients gain realignment pressure.' },
+  ClientRealignment: { target: 'rivalClient', cost: '12 Political Capital, 4 Social Capital', effect: 'Eligible client of another family switches patron.' },
   RegionalRivalry: { target: 'regionalOther', cost: '6 Political Capital', effect: 'Rival loses Political Capital and gains factional division.' },
   DebtShakedown: { target: 'other', cost: '8 Political Capital', effect: 'Extract up to 20 wealth and add target debt.' },
   EconomicExploitation: { target: 'other', cost: '4 Social Capital', effect: 'Extract wealth and stash; target development and happiness fall.' },
   Coup: { target: 'other', cost: '10 Black Budget', effect: 'Seeded coup roll can replace target family control.' },
   FalseFlag: { target: 'self', cost: '8 Black Budget', effect: 'Gain 50 Social Capital.' },
-  CovertInfluence: { target: 'other', cost: '6 Black Budget', effect: 'Target defiance +1; actor Political Capital +5.' },
-  MakeExample: { target: 'defiantClient', cost: '10 Social Capital', effect: 'Reset target defiance; target happiness -20.' },
-  Concession: { target: 'defiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset target defiance; target happiness +10.' },
+  CovertInfluence: { target: 'any', cost: '6 Black Budget', effect: 'Target defiance +1; actor Political Capital +5. Self-target stokes deliberate defiance.' },
+  MakeExample: { target: 'ownDefiantClient', cost: '10 Social Capital', effect: 'Reset own client defiance; target happiness -20.' },
+  Concession: { target: 'ownDefiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset own client defiance; target happiness +10.' },
   Educate: { target: 'self', cost: '8 wealth', effect: 'Education +10, development +3, political side pressure.' },
   Develop: { target: 'self', cost: '10 wealth; needs Industry or Technology', effect: 'Development +10, happiness +3, net wealth -5.' }
 };
 
 function legalActionsFor(family){
-  return ACTIONS.filter(action=>isActionLegal(family, action));
+  return ACTIONS.filter(action=>isActionLegal(family, action) && targetKeysForAction(family, action).length > 0);
 }
 
 function isActionLegal(family, action){
@@ -509,31 +523,40 @@ function isActionLegal(family, action){
   if(action === 'CovertInfluence') return (data.blackBudget||0) >= 6;
   if(action === 'Invade') return (data.armies||0) >= 1 && (data.wealth||0) >= 12;
   if(action === 'Develop') return (data.wealth||0) >= 10 && hasDevelopmentResource(family);
-  if(action === 'RegionalRivalry') return data.type === 'Regional';
+  if(action === 'RegionalRivalry') return data.type === 'Regional' && (data.politicalCapital||0) >= 6;
+  if(action === 'Propaganda') return (data.stash||0) >= 8;
+  if(action === 'Sanction') return (data.politicalCapital||0) >= 5;
+  if(action === 'Protect') return (data.stash||0) >= 6 && (data.wealth||0) >= 8;
+  if(action === 'ProtectionDeal') return (data.stash||0) >= 4 && (data.wealth||0) >= 6;
+  if(action === 'TributeHoliday') return (data.wealth||0) >= 8;
+  if(action === 'ClientRealignment') return (data.politicalCapital||0) >= 12;
+  if(action === 'DebtShakedown') return (data.politicalCapital||0) >= 8;
+  if(action === 'EconomicExploitation') return (data.socialCapital||0) >= 4;
+  if(action === 'MakeExample') return (data.socialCapital||0) >= 10;
+  if(action === 'Concession') return (data.wealth||0) >= 10 && (data.politicalCapital||0) >= 5;
+  if(action === 'Educate') return (data.wealth||0) >= 8;
   return true;
 }
 
 function hasDevelopmentResource(family){
-  const resources = new Set(state[family] && state[family].resources || []);
-  territoryKeys().forEach(k=>{
-    const t = state[k];
-    if(t.type === 'Client' && t.clientOf === state[family].family && (t.defiance||0) === 0){
-      (t.resources || []).forEach(r=>resources.add(r));
-    }
-  });
-  return resources.has('Industry') || resources.has('Technology');
+  if(window.Rules && window.Rules.availableResourcesFor){
+    const resources = window.Rules.availableResourcesFor(family, state);
+    return resources.has('Industry') || resources.has('Technology');
+  }
+  return (state[family] && (state[family].resources || []).some(r=>r === 'Industry' || r === 'Technology')) || false;
 }
 
 function targetKeysForAction(family, action){
   const rule = ACTION_RULES[action] || ACTION_RULES.Pass;
   const all = territoryKeys();
+  const ownFamily = state[family] && state[family].family;
   if(rule.target === 'self') return ['Self'];
   if(rule.target === 'other') return all.filter(k=>k !== family);
-  if(rule.target === 'client') return all.filter(k=>state[k].type === 'Client');
-  if(rule.target === 'controlledClient') return all.filter(k=>state[k].type === 'Client' && state[k].clientOf === state[family].family);
+  if(rule.target === 'rivalClient') return all.filter(k=>k !== family && state[k].type === 'Client' && state[k].clientOf !== ownFamily);
+  if(rule.target === 'controlledClient') return all.filter(k=>state[k].type === 'Client' && state[k].clientOf === ownFamily);
   if(rule.target === 'regionalOther') return all.filter(k=>k !== family && state[k].type === 'Regional');
-  if(rule.target === 'defiantClient') return all.filter(k=>state[k].type === 'Client' && (state[k].defiance||0) > 0);
-  return ['Self'].concat(all);
+  if(rule.target === 'ownDefiantClient') return all.filter(k=>state[k].type === 'Client' && state[k].clientOf === ownFamily && (state[k].defiance||0) > 0);
+  return ['Self'].concat(all.filter(k=>k !== family));
 }
 
 function renderTargetOptions(targetSel, family, action){
@@ -635,7 +658,7 @@ function renderPlayersList(){
     const submitted = gameState.runtime.submissions && gameState.runtime.submissions[family];
     const viewer = (q('view-as') && q('view-as').value) || null;
     if(submitted){
-      submitBtn.textContent = submitted.revealed ? `Submitted` : `Submitted`;
+      submitBtn.textContent = 'Submitted';
     }
 
     // restore existing pending action if any
@@ -729,8 +752,9 @@ function advancePhase(){
 function resetRound(){
   gameState.runtime.pendingActions = {};
   gameState.runtime.locks = {};
-  // unlock UI rows
-  document.querySelectorAll('.player-row').forEach(r=>{ r.classList.remove('locked'); r.querySelectorAll('select').forEach(s=>s.disabled=false); const b=r.querySelector('button'); if(b) b.textContent='Lock'; });
+  gameState.runtime.submissions = {};
+  // full re-render restores every row's controls, labels, and enabled state
+  renderPlayersList();
   log('Round reset — pending actions cleared');
 }
 
@@ -787,20 +811,25 @@ function resolveSubmittedActions(families){
     state[k] = Object.assign(state[k] || {}, cleanupResult.newState[k]);
   });
 
-  // mark submissions as revealed
-  Object.keys(gameState.runtime.submissions || {}).forEach(f=>{ if(gameState.runtime.submissions[f]) gameState.runtime.submissions[f].revealed = true; });
+  // discard the resolved crisis card so it cannot re-apply next round
+  const crisisDeck = gameState.runtime.crisisDeck;
+  if(crisisDeck && crisisDeck.current){ crisisDeck.discard.push(crisisDeck.current); delete crisisDeck.current; }
+  gameState.runtime.crisis = null;
+  renderCrisisUI();
 
   // show engine logs
   result.logs.forEach(line=> log(line));
   cleanupResult.logs.forEach(line=> log(line));
 
-  // update map visuals
+  // update map visuals and side panel
   applyOverlay();
+  if(gameState.ui.selected) updatePanel(gameState.ui.selected);
   // advance round and reset phase
   window.game.round += 1; window.game.phaseIndex = 0; q('round-num').textContent = window.game.round; q('phase-name').textContent = window.game.phases[window.game.phaseIndex];
-  // clear pending actions after resolution
+  // clear pending actions and submissions for the new round
   gameState.runtime.pendingActions = {};
-  // re-render players UI to clear locks and show revealed state
+  gameState.runtime.submissions = {};
+  // re-render players UI so every family gets fresh controls
   renderPlayersList();
   log('Resolution complete');
 }

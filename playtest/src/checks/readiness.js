@@ -45,16 +45,42 @@ function commandCheck(command, args) {
   };
 }
 
+function checkDecisionSchema(errors) {
+  let schema = null;
+  try {
+    schema = readJson('playtest', 'schemas', 'decision.schema.json');
+  } catch (error) {
+    errors.push(`Failed to load playtest/schemas/decision.schema.json: ${error.message}`);
+    return;
+  }
+  if (!schema || schema.type !== 'object') {
+    errors.push('Decision schema must describe a JSON object');
+    return;
+  }
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  const properties = schema.properties || {};
+  for (const field of ['action_id', 'reason', 'plan_tags', 'confidence', 'rule_question']) {
+    if (!required.includes(field)) errors.push(`Decision schema must require ${field}`);
+    if (!properties[field]) errors.push(`Decision schema must define property ${field}`);
+  }
+}
+
 function runReadinessCheck(configPath = 'playtest/configs/qwen3.6-agents.json', experimentPath = 'playtest/configs/experiments.json') {
   const config = readJson(configPath);
   const experiments = readJson(experimentPath);
-  const experiment = experiments.defaultExperiment;
+  const experiment = experiments && experiments.defaultExperiment;
   const errors = [];
   const warnings = [];
 
   if (!config.ollama || !config.ollama.model) errors.push('Missing ollama.model in agent config');
   if (config.ollama && config.ollama.model !== 'qwen3.6') warnings.push(`Configured model is ${config.ollama.model}; expected qwen3.6 for this setup`);
-  if (!experiment || experiment.engine !== 'javascript') errors.push('Default experiment must use the javascript engine');
+  if (!experiment) {
+    errors.push(`Experiment config ${experimentPath} is missing defaultExperiment`);
+    return { ok: false, errors, warnings, actors: [], legalActionCounts: {}, ollamaVersion: null };
+  }
+  if (experiment.engine !== 'javascript') errors.push('Default experiment must use the javascript engine');
+
+  checkDecisionSchema(errors);
 
   Object.values(config.promptFiles || {}).forEach(promptPath => {
     if (!fs.existsSync(fromRepo(promptPath))) errors.push(`Missing prompt file ${promptPath}`);

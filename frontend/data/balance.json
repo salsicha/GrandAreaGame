@@ -1,11 +1,11 @@
 {
   "numericRanges": {
-    "wealth": {"min": 0, "max": 300, "starting": [80, 240]},
+    "wealth": {"min": 0, "max": 600, "starting": [80, 220]},
     "happiness": {"min": 0, "max": 200, "starting": [68, 110]},
     "stash": {"min": 0, "max": 80, "starting": [12, 50]},
     "blackBudget": {"min": 0, "max": 50, "starting": [6, 32]},
-    "socialCapital": {"min": 0, "max": 150, "starting": [56, 118]},
-    "politicalCapital": {"min": 0, "max": 150, "starting": [46, 118]},
+    "socialCapital": {"min": 0, "max": 150, "starting": [56, 110]},
+    "politicalCapital": {"min": 0, "max": 150, "starting": [46, 104]},
     "education": {"min": 0, "max": 150, "starting": [38, 86]},
     "development": {"min": 0, "max": 150, "starting": [38, 92]},
     "debt": {"min": 0, "max": 100, "starting": [0, 14]},
@@ -23,7 +23,7 @@
     }
   },
   "comebackPressure": {
-    "headWealthThreshold": 260,
+    "headWealthThreshold": 300,
     "clientDefianceGain": 1,
     "regionalPoliticalGain": 4,
     "headSocialCapitalPenalty": 6

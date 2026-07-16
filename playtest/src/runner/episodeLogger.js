@@ -9,9 +9,15 @@ class JsonlEpisodeLogger {
     ensureDir(this.outputDir);
     this.filePath = path.join(this.outputDir, `${episodeId}.jsonl`);
     this.stream = fs.createWriteStream(this.filePath, { flags: 'w' });
+    this.streamError = null;
+    this.closePromise = null;
+    this.stream.on('error', error => {
+      this.streamError = error;
+    });
   }
 
   write(record) {
+    if (this.streamError || this.closePromise) return;
     this.stream.write(`${JSON.stringify({
       schemaVersion: 1,
       episodeId: this.episodeId,
@@ -65,10 +71,19 @@ class JsonlEpisodeLogger {
     });
   }
 
+  // Idempotent: flushes buffered lines and resolves once the stream has
+  // finished (or already failed), so callers can await it before exiting.
   close() {
-    return new Promise(resolve => {
-      this.stream.end(resolve);
-    });
+    if (!this.closePromise) {
+      this.closePromise = new Promise(resolve => {
+        if (this.streamError || this.stream.destroyed) {
+          resolve(this.streamError || null);
+          return;
+        }
+        this.stream.end(() => resolve(this.streamError || null));
+      });
+    }
+    return this.closePromise;
   }
 }
 

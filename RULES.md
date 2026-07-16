@@ -40,13 +40,13 @@ Prototype mapping: `type: "Head"` and `clientOf: null`.
 
 Win condition in the prototype:
 
-- Win when wealth is at least `300` and every active client is compliant.
+- Win when wealth is at least `360` and every active client is compliant. With no active clients left, the compliance requirement is trivially met.
 
 Loss conditions in the prototype:
 
 - Lose when personal, political, or social capital reaches `0`.
 - Lose when an uprising collapses family control.
-- Lose when a majority of active clients are defiant.
+- Lose when more than half of all active clients are defiant (a strict majority, counted across every active client in the game).
 
 ## Regional Family
 
@@ -61,7 +61,7 @@ Prototype mapping: `type: "Regional"` and `clientOf: null`.
 
 Win condition in the prototype:
 
-- Win when wealth is at least `260` and political capital is at least `120`.
+- Win when wealth is at least `320` and political capital is at least `130`.
 
 Loss conditions in the prototype:
 
@@ -73,7 +73,7 @@ Loss conditions in the prototype:
 
 Client Families are dependent powers tied to an overlord through tribute.
 
-- Pay tribute to `clientOf` during the tribute phase unless defiant.
+- Pay tribute to `clientOf` during the tribute phase unless defiant. Tribute lapses (nothing is paid or lost) when the overlord has no surviving territory.
 - Can comply, seek protection, build domestic legitimacy, or attempt to break away.
 - Are vulnerable to sanctions, coups, invasions, and coercive pressure from stronger families.
 - Become strategically dangerous when high happiness, development, or independence sentiment makes them a good example for other clients.
@@ -119,7 +119,7 @@ Black Budget is a separate hidden resource from family stash.
 
 - Coup costs `10` Black Budget before the success roll.
 - False Flag costs `8` Black Budget and creates Social Capital cover.
-- Covert Influence costs `6` Black Budget, raises target defiance by `1`, and gives the actor political capital.
+- Covert Influence costs `6` Black Budget, raises target defiance by `1`, and gives the actor political capital. A client may target itself with Covert Influence to deliberately stoke its own defiance and start down the independence path.
 - Black Budget reaching `0` is not an immediate loss condition; it limits covert options.
 
 ## Defiance Contagion
@@ -129,20 +129,23 @@ Clients can spread defiance pressure to nearby or politically related clients.
 - A client emits contagion when happiness crosses `120`, defiance reaches `3`, or the client wins through the defiant good-example path.
 - Contagion targets clients with the same `clientOf` relationship or an adjacent `neighbors` relationship.
 - Each affected target gains `1` defiance.
+- Contagion resolves as a single deterministic wave per resolution: sources are fixed before any defiance is added, so a client pushed over a threshold by contagion only becomes a source in the next round.
 
 ## Example Response
 
 Defiant clients require a response.
 
-- `MakeExample` targets a defiant client, resets defiance to `0`, lowers target happiness by `20`, costs the actor `10` Social Capital, and gives the actor `5` Political Capital.
-- `Concession` targets a defiant client, resets defiance to `0`, raises target happiness by `10`, costs the actor `10` wealth and `5` Political Capital, and gives the actor `5` Social Capital.
-- Any defiant client left unanswered costs its overlord `5` Social Capital and `5` Political Capital during resolution.
+- `MakeExample` targets one of the actor's own defiant clients, resets defiance to `0`, lowers target happiness by `20`, costs the actor `10` Social Capital, and gives the actor `5` Political Capital. The full Social Capital cost must be affordable or the action fails.
+- `Concession` targets one of the actor's own defiant clients, resets defiance to `0`, raises target happiness by `10`, costs the actor `10` wealth and `5` Political Capital, and gives the actor `5` Social Capital. Both costs must be affordable or the action fails.
+- Only the client's overlord can respond with `MakeExample` or `Concession`; third parties cannot farm the response reward.
+- Any defiant client left unanswered costs its overlord `5` Social Capital and `5` Political Capital during resolution. Eliminated clients and eliminated overlords are excluded from this pressure.
 
 ## Resources
 
 Resources are constraints, not just labels.
 
 - Territories use their own `resources` plus resources from compliant clients they control.
+- Compliant clients also use their overlord family's resources and the resources of compliant bloc-mates (clients of the same overlord). Defiance cuts a client off from the bloc pool, so choosing independence means accepting shortage pressure.
 - Missing each required resource costs `5` wealth, `2` development, and `2` happiness during cleanup.
 - Missing `Oil` adds extra wealth loss equal to the territory's `armies`.
 - Global austerity is harsher for territories missing `Grain` or `Finance`.
@@ -172,9 +175,10 @@ Education and development are long-term investments with political side effects.
 
 Major actions are balanced around cost, target damage, and political side effects.
 
-- `Invade` costs wealth and armies, marks the target invaded, damages wealth and happiness, raises fear and governance-change pressure, and increases client defiance.
+- Coercive and extractive actions (`Invade`, `Sanction`, `Coup`, `DebtShakedown`, `EconomicExploitation`, `Protect`, `ProtectionDeal`, `ClientRealignment`, `MakeExample`, `Concession`) cannot target the actor's own territory.
+- `Invade` costs wealth and armies, marks the target invaded, damages wealth and happiness, raises fear and governance-change pressure, and increases client defiance. Invading a territory protected by another family costs the invader an extra `5` Political Capital and `5` Social Capital in backlash.
 - `Sanction` costs Political Capital, damages target wealth, happiness, and development, and creates governance-change pressure.
-- `Protect` costs wealth and stash, marks a protected relationship, increases target happiness, reduces target fear, and can raise defiance if the target is another family's client.
+- `Protect` costs wealth and stash, marks a protected relationship lasting `2` cleanup rounds, increases target happiness, reduces target fear, and can raise defiance if the target is another family's client. Protection expires when the `protectionDeal` counter reaches `0`.
 - `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success.
 - `DebtShakedown` costs Political Capital, converts target wealth into actor wealth, raises target debt, lowers happiness, and creates backlash.
 - `EconomicExploitation` costs Social Capital, extracts wealth and stash value, lowers target development and happiness, and creates backlash.
@@ -213,7 +217,7 @@ The prototype represents negotiation with explicit action hooks so table deals h
 
 - `TributeHoliday` lets an overlord waive one client tribute payment, lowering defiance at wealth cost.
 - `ProtectionDeal` creates a temporary protection relationship and can create realignment pressure when used on another family's client.
-- `ClientRealignment` lets a ready client switch `clientOf` to a new patron when defiance, independence sentiment, or realignment pressure is high enough.
+- `ClientRealignment` lets a ready client switch `clientOf` to a new patron when defiance, independence sentiment, or realignment pressure is high enough. The target must belong to a different family's hierarchy: an overlord cannot "realign" its own client to launder away defiance.
 - `RegionalRivalry` lets one regional family damage another regional family's Political Capital and factional stability.
 
 ## Round Timing

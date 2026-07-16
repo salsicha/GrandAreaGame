@@ -7,23 +7,31 @@ const ACTION_RULES = {
   Propaganda: { target: 'any', cost: '8 stash', effect: 'Target happiness +10.', tags: ['happiness', 'public-order'] },
   Invade: { target: 'other', cost: '12 wealth, 1 army, backlash', effect: 'Target invaded, wealth -10, happiness loss, fear +10.', tags: ['military', 'coercion'] },
   Sanction: { target: 'other', cost: '5 Political Capital', effect: 'Target wealth, happiness, and development fall.', tags: ['economy', 'coercion'] },
-  Protect: { target: 'any', cost: '8 wealth, 6 stash', effect: 'Target protected, happiness +8, fear reduced.', tags: ['protection', 'relationship'] },
+  Protect: { target: 'other', cost: '8 wealth, 6 stash', effect: 'Target protected, happiness +8, fear reduced.', tags: ['protection', 'relationship'] },
   TributeHoliday: { target: 'controlledClient', cost: '8 wealth', effect: 'Client skips one tribute and loses 1 defiance.', tags: ['client-management'] },
-  ProtectionDeal: { target: 'any', cost: '6 wealth, 4 stash', effect: 'Temporary protection; rival clients gain realignment pressure.', tags: ['relationship', 'realignment'] },
-  ClientRealignment: { target: 'client', cost: '12 Political Capital, 4 Social Capital', effect: 'Eligible client switches patron.', tags: ['relationship', 'realignment'] },
+  ProtectionDeal: { target: 'other', cost: '6 wealth, 4 stash', effect: 'Temporary protection; rival clients gain realignment pressure.', tags: ['relationship', 'realignment'] },
+  ClientRealignment: { target: 'eligibleRivalClient', cost: '12 Political Capital, 4 Social Capital', effect: 'Eligible rival client switches patron.', tags: ['relationship', 'realignment'] },
   RegionalRivalry: { target: 'regionalOther', cost: '6 Political Capital', effect: 'Rival loses Political Capital and gains factional division.', tags: ['regional', 'competition'] },
   DebtShakedown: { target: 'other', cost: '8 Political Capital', effect: 'Extract up to 20 wealth and add target debt.', tags: ['economy', 'debt'] },
   EconomicExploitation: { target: 'other', cost: '4 Social Capital', effect: 'Extract wealth and stash; target development and happiness fall.', tags: ['economy', 'extraction'] },
   Coup: { target: 'other', cost: '10 Black Budget', effect: 'Seeded coup roll can replace target family control.', tags: ['covert', 'control'] },
   FalseFlag: { target: 'self', cost: '8 Black Budget', effect: 'Gain 50 Social Capital.', tags: ['covert', 'social-capital'] },
-  CovertInfluence: { target: 'other', cost: '6 Black Budget', effect: 'Target defiance +1; actor Political Capital +5.', tags: ['covert', 'defiance'] },
-  MakeExample: { target: 'defiantClient', cost: '10 Social Capital', effect: 'Reset target defiance; target happiness -20.', tags: ['client-management', 'coercion'] },
-  Concession: { target: 'defiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset target defiance; target happiness +10.', tags: ['client-management', 'happiness'] },
+  CovertInfluence: { target: 'any', cost: '6 Black Budget', effect: 'Target defiance +1; actor Political Capital +5. Self-target is the client path to deliberate defiance.', tags: ['covert', 'defiance'] },
+  MakeExample: { target: 'ownDefiantClient', cost: '10 Social Capital', effect: 'Reset own defiant client; target happiness -20.', tags: ['client-management', 'coercion'] },
+  Concession: { target: 'ownDefiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset own defiant client; target happiness +10.', tags: ['client-management', 'happiness'] },
   Educate: { target: 'self', cost: '8 wealth', effect: 'Education +10, development +3, political side pressure.', tags: ['education', 'development'] },
   Develop: { target: 'self', cost: '10 wealth; needs Industry or Technology', effect: 'Development +10, happiness +3, net wealth -5.', tags: ['development', 'economy'] }
 };
 
 const ACTIONS = Object.keys(ACTION_RULES);
+
+const MAX_RECENT_EVENTS = 60;
+
+const NOISE_EVENT_PATTERNS = [
+  /^Using replay seed:/,
+  /^Resolving actions \(/,
+  /sentiment changed \(/
+];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -53,48 +61,83 @@ function isEliminated(data) {
   return data.family === 'Anarchy' || data.family === 'Collapsed' || data.outcome === 'Lost';
 }
 
-function availableResourcesFor(state, actor) {
-  const data = state.territories[actor];
-  const resources = new Set(data && Array.isArray(data.resources) ? data.resources : []);
-  territoryKeys(state).forEach(key => {
-    const other = state.territories[key];
-    if (other.type === 'Client' && other.clientOf === data.family && (other.defiance || 0) === 0) {
-      (other.resources || []).forEach(resource => resources.add(resource));
-    }
-  });
-  return resources;
+function seededShuffle(items, rng) {
+  const out = items.slice();
+  for (let index = out.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(rng() * (index + 1));
+    const held = out[index];
+    out[index] = out[swap];
+    out[swap] = held;
+  }
+  return out;
 }
 
-function isActionLegal(state, actor, action) {
+// Mirrors every affordability and actor-type gate in frontend/rules.js so that
+// enumerated actions never resolve to a "failed <Action> (...)" engine log.
+function isActionLegal(rules, state, actor, action) {
   const data = state.territories[actor] || {};
   if (isEliminated(data)) return action === 'Pass';
-  if (action === 'Coup') return (data.blackBudget || 0) >= 10;
-  if (action === 'FalseFlag') return (data.blackBudget || 0) >= 8;
-  if (action === 'CovertInfluence') return (data.blackBudget || 0) >= 6;
-  if (action === 'Invade') return (data.armies || 0) >= 1 && (data.wealth || 0) >= 12;
-  if (action === 'Develop') {
-    const resources = availableResourcesFor(state, actor);
-    return (data.wealth || 0) >= 10 && (resources.has('Industry') || resources.has('Technology'));
+  switch (action) {
+    case 'Pass': return true;
+    case 'Skim': return true;
+    case 'Propaganda': return (data.stash || 0) >= 8;
+    case 'Invade': return (data.armies || 0) >= 1 && (data.wealth || 0) >= 12;
+    case 'Sanction': return (data.politicalCapital || 0) >= 5;
+    case 'Protect': return (data.stash || 0) >= 6 && (data.wealth || 0) >= 8;
+    case 'TributeHoliday': return (data.wealth || 0) >= 8;
+    case 'ProtectionDeal': return (data.stash || 0) >= 4 && (data.wealth || 0) >= 6;
+    case 'ClientRealignment': return (data.politicalCapital || 0) >= 12;
+    case 'RegionalRivalry': return data.type === 'Regional' && (data.politicalCapital || 0) >= 6;
+    case 'DebtShakedown': return (data.politicalCapital || 0) >= 8;
+    case 'EconomicExploitation': return (data.socialCapital || 0) >= 4;
+    case 'Coup': return (data.blackBudget || 0) >= 10;
+    case 'FalseFlag': return (data.blackBudget || 0) >= 8;
+    case 'CovertInfluence': return (data.blackBudget || 0) >= 6;
+    case 'MakeExample': return (data.socialCapital || 0) >= 10;
+    case 'Concession': return (data.wealth || 0) >= 10 && (data.politicalCapital || 0) >= 5;
+    case 'Educate': return (data.wealth || 0) >= 8;
+    case 'Develop': {
+      if ((data.wealth || 0) < 10) return false;
+      const resources = rules.availableResourcesFor(actor, state.territories);
+      return resources.has('Industry') || resources.has('Technology');
+    }
+    default: return false;
   }
-  if (action === 'RegionalRivalry') return data.type === 'Regional';
-  return true;
 }
 
+// Mirrors the engine's relationship gates: offensive actions reject self-target,
+// MakeExample/Concession only work on the actor's own defiant clients, and
+// ClientRealignment only works on other families' eligible clients.
 function targetKeysForAction(state, actor, action) {
   const rule = ACTION_RULES[action] || ACTION_RULES.Pass;
-  const all = territoryKeys(state);
+  const actorData = state.territories[actor] || {};
+  const others = territoryKeys(state).filter(key => key !== actor && !isEliminated(state.territories[key]));
   if (rule.target === 'self') return ['Self'];
-  if (rule.target === 'other') return all.filter(key => key !== actor);
-  if (rule.target === 'client') return all.filter(key => state.territories[key].type === 'Client');
+  if (rule.target === 'any') return ['Self'].concat(others);
+  if (rule.target === 'other') return others;
   if (rule.target === 'controlledClient') {
-    return all.filter(key => {
+    return others.filter(key => {
       const target = state.territories[key];
-      return target.type === 'Client' && target.clientOf === state.territories[actor].family;
+      return target.type === 'Client' && target.clientOf === actorData.family;
     });
   }
-  if (rule.target === 'regionalOther') return all.filter(key => key !== actor && state.territories[key].type === 'Regional');
-  if (rule.target === 'defiantClient') return all.filter(key => state.territories[key].type === 'Client' && (state.territories[key].defiance || 0) > 0);
-  return ['Self'].concat(all);
+  if (rule.target === 'ownDefiantClient') {
+    return others.filter(key => {
+      const target = state.territories[key];
+      return target.type === 'Client' && target.clientOf === actorData.family && (target.defiance || 0) > 0;
+    });
+  }
+  if (rule.target === 'eligibleRivalClient') {
+    return others.filter(key => {
+      const target = state.territories[key];
+      if (target.type !== 'Client' || target.clientOf === actorData.family) return false;
+      return (target.defiance || 0) > 0
+        || (target.independenceSentiment || 0) >= 50
+        || (target.realignmentPressure || 0) >= 8;
+    });
+  }
+  if (rule.target === 'regionalOther') return others.filter(key => state.territories[key].type === 'Regional');
+  return ['Self'];
 }
 
 function framingOptionsFor(state, actor, action) {
@@ -103,24 +146,37 @@ function framingOptionsFor(state, actor, action) {
   return [0, 5, 10, 20].filter(value => value <= available);
 }
 
-function normalizeTarget(actor, target) {
-  return target === 'Self' ? actor : target;
-}
-
 function actionSummary(actor, action, target, framing) {
   const targetText = target === 'Self' ? actor : target;
   const suffix = framing > 0 ? ` Spend ${framing} Social Capital on framing.` : '';
   return `${actor}: ${action} -> ${targetText}. ${ACTION_RULES[action].effect}${suffix}`;
 }
 
+function salientEvents(logs, round) {
+  return logs
+    .filter(line => !NOISE_EVENT_PATTERNS.some(pattern => pattern.test(line)))
+    .slice(-MAX_RECENT_EVENTS)
+    .map((summary, index) => ({
+      round,
+      event: `round-${round}-${index}`,
+      summary
+    }));
+}
+
 class JavaScriptGameAdapter {
   constructor(options = {}) {
     this.rules = loadRules();
     this.maxRounds = options.maxRounds || 12;
+    this.crisisCards = clone(readJson('frontend', 'data', 'crisis.json'));
+    this.crisisById = new Map(this.crisisCards.map(card => [card.id, card]));
   }
 
   createInitialState(config = {}, seed = 'playtest') {
-    return {
+    const drawPile = seededShuffle(
+      this.crisisCards.map(card => card.id),
+      this.rules.createSeededRandom(`${seed}:crisis-deck`)
+    );
+    const state = {
       schemaVersion: 1,
       gameId: config.gameId || `grand-area-${seed}`,
       engine: 'javascript',
@@ -129,8 +185,27 @@ class JavaScriptGameAdapter {
       maxRounds: config.maxRounds || this.maxRounds,
       seed,
       territories: clone(readJson('frontend', 'data', 'territories.json')),
-      recentEvents: []
+      recentEvents: [],
+      crisisDeck: { drawPile, discard: [] },
+      crisis: null
     };
+    this.drawCrisis(state, `${seed}:crisis-reshuffle:setup`);
+    return state;
+  }
+
+  drawCrisis(state, reshuffleSeed) {
+    const deck = state.crisisDeck || { drawPile: [], discard: [] };
+    let drawPile = deck.drawPile.slice();
+    let discard = deck.discard.slice();
+    if (drawPile.length === 0 && discard.length > 0) {
+      drawPile = seededShuffle(discard, this.rules.createSeededRandom(reshuffleSeed));
+      discard = [];
+    }
+    const nextId = drawPile.shift() || null;
+    if (nextId) discard.push(nextId);
+    state.crisisDeck = { drawPile, discard };
+    state.crisis = nextId ? clone(this.crisisById.get(nextId)) : null;
+    return state;
   }
 
   cloneState(state) {
@@ -177,6 +252,11 @@ class JavaScriptGameAdapter {
       phase: state.phase,
       actor,
       role: own.type,
+      crisis: state.crisis ? {
+        id: state.crisis.id,
+        title: state.crisis.title,
+        description: state.crisis.description
+      } : null,
       publicState: {
         territories: publicTerritories
       },
@@ -186,7 +266,7 @@ class JavaScriptGameAdapter {
         stash: own.stash || 0,
         blackBudget: own.blackBudget || 0
       },
-      recentEvents: state.recentEvents.slice(-12),
+      recentEvents: state.recentEvents.slice(-MAX_RECENT_EVENTS),
       strategicFeatures: this.getStrategicFeatures(state, actor)
     };
   }
@@ -194,6 +274,7 @@ class JavaScriptGameAdapter {
   getStrategicFeatures(state, actor) {
     const data = state.territories[actor];
     const role = data.type;
+    const objectives = this.rules.OBJECTIVES;
     const features = {
       availableActionCount: this.listLegalActions(state, actor).length,
       forcedPass: false,
@@ -201,16 +282,16 @@ class JavaScriptGameAdapter {
       roundsRemainingEstimate: Math.max(0, state.maxRounds - state.round + 1)
     };
     if (role === 'Head') {
-      features.wealthToVictory = Math.max(0, 300 - (data.wealth || 0));
+      features.wealthToVictory = Math.max(0, objectives.headWealthWin - (data.wealth || 0));
       features.compliantClients = territoryKeys(state).filter(key => state.territories[key].type === 'Client' && state.territories[key].clientOf === data.family && (state.territories[key].defiance || 0) === 0).length;
       features.defiantClients = territoryKeys(state).filter(key => state.territories[key].type === 'Client' && state.territories[key].clientOf === data.family && (state.territories[key].defiance || 0) > 0).length;
     } else if (role === 'Regional') {
-      features.wealthToVictory = Math.max(0, 260 - (data.wealth || 0));
-      features.politicalCapitalToVictory = Math.max(0, 120 - (data.politicalCapital || 0));
+      features.wealthToVictory = Math.max(0, objectives.regionalWealthWin - (data.wealth || 0));
+      features.politicalCapitalToVictory = Math.max(0, objectives.regionalPoliticalWin - (data.politicalCapital || 0));
     } else {
-      features.happinessToVictory = Math.max(0, 120 - (data.happiness || 0));
-      features.developmentToVictory = Math.max(0, 70 - (data.development || 0));
-      features.independenceToVictory = Math.max(0, 60 - (data.independenceSentiment || 0));
+      features.happinessToVictory = Math.max(0, objectives.clientHappinessWin - (data.happiness || 0));
+      features.developmentToVictory = Math.max(0, objectives.clientDevelopmentWin - (data.development || 0));
+      features.independenceToVictory = Math.max(0, objectives.clientIndependenceWin - (data.independenceSentiment || 0));
       features.defiant = (data.defiance || 0) > 0;
     }
     features.forcedPass = features.availableActionCount === 1;
@@ -219,7 +300,7 @@ class JavaScriptGameAdapter {
 
   listLegalActions(state, actor) {
     const legal = [];
-    ACTIONS.filter(action => isActionLegal(state, actor, action)).forEach(action => {
+    ACTIONS.filter(action => isActionLegal(this.rules, state, actor, action)).forEach(action => {
       targetKeysForAction(state, actor, action).forEach(target => {
         framingOptionsFor(state, actor, action).forEach(framing => {
           const rule = ACTION_RULES[action];
@@ -248,20 +329,28 @@ class JavaScriptGameAdapter {
       framing: action.parameters && action.parameters.framing || 0
     }));
     const beforeHash = this.hashState(state);
+    const logs = [];
+    const crisis = state.crisis ? clone(state.crisis) : null;
+    if (crisis) logs.push(`Crisis drawn for round ${state.round}: ${crisis.id} (${crisis.title})`);
     const tribute = this.rules.resolveTribute(state.territories);
-    const resolved = this.rules.resolveTurn(tribute.newState, chosen, { seed: `${seed}:actions` });
+    const actionInput = { ...tribute.newState };
+    if (crisis) actionInput.crisis = crisis;
+    const resolved = this.rules.resolveTurn(actionInput, chosen, { seed: `${seed}:actions` });
     const cleanup = this.rules.resolveCleanup(resolved.newState, { seed: `${seed}:cleanup` });
-    const logs = tribute.logs.concat(resolved.logs, cleanup.logs);
+    logs.push(...tribute.logs, ...resolved.logs, ...cleanup.logs);
     const nextState = {
       ...state,
       round: state.round + 1,
       territories: cleanup.newState,
-      recentEvents: logs.slice(-20).map((summary, index) => ({
-        round: state.round,
-        event: `round-${state.round}-${index}`,
-        summary
-      }))
+      recentEvents: salientEvents(logs, state.round)
     };
+    if (this.isTerminal(nextState)) {
+      nextState.crisis = null;
+      nextState.phase = 'complete';
+    } else {
+      this.drawCrisis(nextState, `${seed}:crisis-reshuffle`);
+      nextState.phase = 'secret-action';
+    }
     return {
       state: nextState,
       logs,
@@ -308,6 +397,8 @@ class JavaScriptGameAdapter {
       gameId: state.gameId,
       round: state.round,
       phase: state.phase,
+      crisis: state.crisis ? state.crisis.id : null,
+      crisisDeck: state.crisisDeck || null,
       territories: state.territories
     };
   }
@@ -327,6 +418,5 @@ module.exports = {
   ACTION_RULES,
   ACTIONS,
   JavaScriptGameAdapter,
-  validateSelectedAction,
-  normalizeTarget
+  validateSelectedAction
 };
