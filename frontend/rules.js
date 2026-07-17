@@ -48,6 +48,8 @@
 
   const ACTION_PRIORITY = {
     Pass: 0,
+    CounterIntel: 1,
+    Fortify: 1,
     Concession: 1,
     TributeHoliday: 1,
     Protect: 2,
@@ -592,6 +594,21 @@
     }));
 
     normalized.forEach((entry, index)=>{ entry.order = index; });
+
+    // Defensive stances register (and pay) before any offensive action
+    // resolves, so their protection is independent of turn order.
+    normalized.forEach(entry=>{
+      const S = newState[entry.family];
+      if(!S || isEliminated(S)) return;
+      if(entry.action === 'CounterIntel' && (S.blackBudget||0) >= 4){
+        S.blackBudget = (S.blackBudget||0) - 4;
+        S.counterIntelActive = true;
+      } else if(entry.action === 'Fortify' && (S.wealth||0) >= 6){
+        S.wealth = (S.wealth||0) - 6;
+        S.fortified = true;
+      }
+    });
+
     normalized.sort((a,b)=>compareActions(a, b, newState));
     logs.push('Resolving actions (wealth, role, action priority, family id)');
 
@@ -608,6 +625,16 @@
       }
 
       switch(act){
+        case 'CounterIntel':{
+          if(A.counterIntelActive){ logs.push(`${actor} runs counterintelligence sweeps this round`); }
+          else { logs.push(`${actor} failed CounterIntel (insufficient Black Budget)`); }
+          break;
+        }
+        case 'Fortify':{
+          if(A.fortified){ logs.push(`${actor} fortifies against invasion this round`); }
+          else { logs.push(`${actor} failed Fortify (insufficient wealth)`); }
+          break;
+        }
         case 'Skim':{
           const amt = 10;
           if(T){ const transferred = Math.min(amt, T.wealth||0); T.wealth = clamp((T.wealth||0) - transferred, 0); A.stash = (A.stash||0) + transferred; T.happiness = clamp((T.happiness||0) - 6, 0); logs.push(`${actor} skimmed ${transferred} from ${target}`); }
@@ -627,22 +654,27 @@
             if((A.armies||0) < armyCost){ logs.push(`${actor} failed Invade (insufficient armies)`); break; }
             if((A.wealth||0) < wealthCost){ logs.push(`${actor} failed Invade (insufficient wealth)`); break; }
             const protectedTarget = !!T.protected && T.protectedBy && T.protectedBy !== A.family;
+            const fortified = !!T.fortified;
             const framing = spendFraming(A, entry.framing, 'Invade', logs);
-            const happinessLoss = Math.max(8, 25 - framing);
+            const happinessLoss = fortified ? Math.ceil(Math.max(8, 25 - framing) / 2) : Math.max(8, 25 - framing);
+            const wealthDamage = fortified ? 5 : 10;
             const socialPenalty = Math.max(0, 15 - Math.floor(framing / 2));
             A.wealth = clamp((A.wealth||0) - wealthCost, 0);
             A.armies = clamp((A.armies||0) - armyCost, 0);
-            A.politicalCapital = (A.politicalCapital||0) + 5;
+            if(!fortified) A.politicalCapital = (A.politicalCapital||0) + 5;
             T.invaded = true;
             T.protected = false;
             T.protectedBy = null;
             T.happiness = clamp((T.happiness||0) - happinessLoss, 0);
-            T.wealth = clamp((T.wealth||0) - 10, 0);
+            T.wealth = clamp((T.wealth||0) - wealthDamage, 0);
             T.fear = clamp((T.fear||0) + 10, 0, 100);
             T.governanceChangeSentiment = clamp((T.governanceChangeSentiment||0) + 8, 0, 100);
-            if(T.type === 'Client') T.defiance = (T.defiance||0) + 1;
+            if(T.type === 'Client' && !fortified) T.defiance = (T.defiance||0) + 1;
             A.socialCapital = clamp((A.socialCapital||0) - socialPenalty, 0);
             logs.push(`${actor} invaded ${target}${framing > 0 ? ' with framing' : ' without framing'} (-${wealthCost} wealth, -${armyCost} army, -${happinessLoss} happiness, -${socialPenalty} backlash)`);
+            if(fortified){
+              logs.push(`${target} fortifications blunt the invasion (damage halved, no rally for ${actor})`);
+            }
             if(protectedTarget){
               A.politicalCapital = clamp((A.politicalCapital||0) - 5, 0);
               A.socialCapital = clamp((A.socialCapital||0) - 5, 0);
@@ -832,6 +864,13 @@
           if((A.blackBudget||0) < coupCost){ logs.push(`${actor} failed Coup (insufficient Black Budget)`); break; }
           A.blackBudget = (A.blackBudget||0) - coupCost;
           const framing = spendFraming(A, entry.framing, 'Coup', logs);
+          if(T.counterIntelActive){
+            // Foiled: the op is exposed before it can roll.
+            A.socialCapital = clamp((A.socialCapital||0) - 8, 0);
+            T.politicalCapital = (T.politicalCapital||0) + 5;
+            logs.push(`${actor}'s coup against ${target} was foiled by counterintelligence (exposed: -8 Social Capital; ${target} +5 Political Capital)`);
+            break;
+          }
           const ap = (A.politicalCapital||0); const tp = (T.politicalCapital||0);
           const sentimentPressure = ((T.governanceChangeSentiment||0) + (T.factionalDivision||0) - (T.fear||0)) / 300.0;
           let base = 0.5 + (ap - tp) / 200.0 + sentimentPressure; base = clamp(base, 0.1, 0.95);
@@ -845,10 +884,13 @@
             A.politicalCapital = (A.politicalCapital||0) + 10;
             logs.push(`${actor} successfully executed a coup against ${target}`);
           } else {
-            // failed coup
+            // failed coup: the target rallies around the flag
             A.politicalCapital = clamp((A.politicalCapital||0) - 15, 0);
             A.socialCapital = clamp((A.socialCapital||0) - Math.max(0, 20 - framing), 0);
+            T.politicalCapital = (T.politicalCapital||0) + 5;
+            T.fear = clamp((T.fear||0) + 4, 0, 100);
             logs.push(`${actor} failed coup against ${target}`);
+            logs.push(`${target} rallies around the flag (+5 Political Capital, +4 fear)`);
           }
           break;
         }
@@ -861,8 +903,17 @@
         case 'CovertInfluence':{
           const cost = 6;
           if(!T){ logs.push(`${actor} attempted CovertInfluence against missing target ${target}`); break; }
-          if((A.blackBudget||0) < cost){ logs.push(`${actor} failed CovertInfluence (insufficient Black Budget)`); }
-          else { A.blackBudget = (A.blackBudget||0) - cost; T.defiance = (T.defiance||0) + 1; A.politicalCapital = (A.politicalCapital||0) + 5; logs.push(`${actor} used CovertInfluence on ${target} (defiance +1, politicalCapital +5)`); }
+          if((A.blackBudget||0) < cost){ logs.push(`${actor} failed CovertInfluence (insufficient Black Budget)`); break; }
+          A.blackBudget = (A.blackBudget||0) - cost;
+          if(target !== actor && T.counterIntelActive){
+            A.socialCapital = clamp((A.socialCapital||0) - 8, 0);
+            T.politicalCapital = (T.politicalCapital||0) + 5;
+            logs.push(`${actor}'s covert influence in ${target} was foiled by counterintelligence (exposed: -8 Social Capital; ${target} +5 Political Capital)`);
+            break;
+          }
+          T.defiance = (T.defiance||0) + 1;
+          A.politicalCapital = (A.politicalCapital||0) + 5;
+          logs.push(`${actor} used CovertInfluence on ${target} (defiance +1, politicalCapital +5)`);
           break;
         }
         case 'MakeExample':{
@@ -898,6 +949,12 @@
       // clamp common values
       if(T){ T.wealth = clamp(T.wealth, 0); T.happiness = clamp(T.happiness, 0, 200); T.debt = clamp(T.debt || 0, 0); T.defiance = Math.max(0, T.defiance || 0); }
       A.wealth = clamp(A.wealth, 0); A.stash = clamp(A.stash, 0); A.blackBudget = clamp(A.blackBudget, 0); A.socialCapital = clamp(A.socialCapital, 0); A.politicalCapital = clamp(A.politicalCapital, 0); A.armies = clamp(A.armies, 0); A.happiness = clamp(A.happiness, 0, 200); A.education = clamp(A.education, 0, 150); A.development = clamp(A.development, 0, 150); A.debt = clamp(A.debt || 0, 0);
+    });
+
+    // Stances are one-round effects; never let them leak into saved state.
+    Object.keys(newState).forEach(k=>{
+      delete newState[k].counterIntelActive;
+      delete newState[k].fortified;
     });
 
     const pressureResult = applyUnansweredDefiancePressure(newState);

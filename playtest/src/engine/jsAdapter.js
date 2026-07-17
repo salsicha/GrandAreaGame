@@ -17,6 +17,8 @@ const ACTION_RULES = {
   Coup: { target: 'other', cost: '10 Black Budget', effect: 'Seeded coup roll can replace target family control.', tags: ['covert', 'control'] },
   FalseFlag: { target: 'self', cost: '8 Black Budget', effect: 'Gain 50 Social Capital.', tags: ['covert', 'social-capital'] },
   CovertInfluence: { target: 'any', cost: '6 Black Budget', effect: 'Target defiance +1; actor Political Capital +5. Self-target is the client path to deliberate defiance.', tags: ['covert', 'defiance'] },
+  CounterIntel: { target: 'self', cost: '4 Black Budget', effect: 'Stance: foils coups and covert influence against you this round; attackers exposed (-8 Social Capital), you gain +5 Political Capital per foiled op.', tags: ['covert', 'defense'] },
+  Fortify: { target: 'self', cost: '6 wealth', effect: 'Stance: invasions against you this round are blunted (damage halved, no defiance bump, invader gains no Political Capital).', tags: ['defense', 'military'] },
   MakeExample: { target: 'ownDefiantClient', cost: '10 Social Capital', effect: 'Reset own defiant client; target happiness -20.', tags: ['client-management', 'coercion'] },
   Concession: { target: 'ownDefiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset own defiant client; target happiness +10.', tags: ['client-management', 'happiness'] },
   Educate: { target: 'self', cost: '8 wealth', effect: 'Education +10, development +3, political side pressure.', tags: ['education', 'development'] },
@@ -93,6 +95,8 @@ function isActionLegal(rules, state, actor, action) {
     case 'Coup': return (data.blackBudget || 0) >= 10;
     case 'FalseFlag': return (data.blackBudget || 0) >= 8;
     case 'CovertInfluence': return (data.blackBudget || 0) >= 6;
+    case 'CounterIntel': return (data.blackBudget || 0) >= 4;
+    case 'Fortify': return (data.wealth || 0) >= 6;
     case 'MakeExample': return (data.socialCapital || 0) >= 10;
     case 'Concession': return (data.wealth || 0) >= 10 && (data.politicalCapital || 0) >= 5;
     case 'Educate': return (data.wealth || 0) >= 8;
@@ -257,6 +261,10 @@ class JavaScriptGameAdapter {
         title: state.crisis.title,
         description: state.crisis.description
       } : null,
+      // The upcoming crisis is public knowledge in the rules.
+      nextCrisis: (state.crisisDeck && state.crisisDeck.drawPile && state.crisisDeck.drawPile.length > 0)
+        ? { id: state.crisisDeck.drawPile[0] }
+        : null,
       publicState: {
         territories: publicTerritories
       },

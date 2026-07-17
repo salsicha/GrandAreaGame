@@ -103,6 +103,8 @@ if (!function_exists('grandarea_allowed_actions')) {
             'Coup',
             'FalseFlag',
             'CovertInfluence',
+            'CounterIntel',
+            'Fortify',
             'MakeExample',
             'Concession',
             'Educate',

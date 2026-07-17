@@ -193,13 +193,21 @@ Major actions are balanced around cost, target damage, and political side effect
 - `Invade` costs wealth and armies, marks the target invaded, damages wealth and happiness, raises fear and governance-change pressure, and increases client defiance. Invading a territory protected by another family costs the invader an extra `5` Political Capital and `5` Social Capital in backlash.
 - `Sanction` costs Political Capital, damages target wealth, happiness, and development, and creates governance-change pressure.
 - `Protect` costs wealth and stash, marks a protected relationship lasting `2` cleanup rounds, increases target happiness, reduces target fear, and can raise defiance if the target is another family's client. Protection expires when the `protectionDeal` counter reaches `0`.
-- `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success. A successful coup transfers family control and resets the territory's defiant-majority counter: the new ruling family starts with a fresh grace period.
+- `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success. A successful coup transfers family control and resets the territory's defiant-majority counter: the new ruling family starts with a fresh grace period. A failed coup rallies the target around the flag: the target gains `5` Political Capital and `4` fear.
 - `DebtShakedown` costs Political Capital, converts target wealth into actor wealth, raises target debt, lowers happiness, and creates backlash.
 - `EconomicExploitation` costs Social Capital, extracts wealth and stash value, lowers target development and happiness, and creates backlash.
 
+## Defensive Stances
+
+Stances are secret actions that spend your turn on protection instead of progress. They register before any offensive action resolves, regardless of turn order, and last only for the round they are played — so they reward reading your rivals and punish paranoia.
+
+- `CounterIntel` costs `4` Black Budget. Any `Coup` or `CovertInfluence` targeting you this round is foiled before it takes effect: the attacker still pays their costs, is exposed for `8` Social Capital, and you gain `5` Political Capital per foiled operation. Self-targeted Covert Influence is never foiled by the actor's own sweep.
+- `Fortify` costs `6` wealth. Invasions against you this round are blunted: happiness damage is halved (rounded up), territory wealth damage is halved, your client defiance does not rise, and the invader gains no Political Capital rally. The invader still pays full costs and backlash.
+- A stance spent on a round where nobody attacks you is simply spent — the bluff is the point.
+
 ## Crisis Deck
 
-Crisis cards carry both rules metadata and playtest context.
+Crisis cards carry both rules metadata and playtest context. The top card of the crisis deck is public knowledge: everyone sees next round's storm coming and can position for it, so crises are strategic weather rather than random punishment.
 
 - `type` groups the crisis, such as defiance event, resource shock, financial crisis, legitimacy scandal, alignment crisis, or global economic pressure.
 - `targeting` defines who is affected. Current scopes include `all`, `clients`, `defiantClients`, `resourceNeed`, `resourceHolder`, `highestDebt`, and `highestFactionalDivision`.

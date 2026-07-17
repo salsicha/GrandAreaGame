@@ -28,6 +28,8 @@ define([
     Coup: 'other',
     FalseFlag: 'self',
     CovertInfluence: 'any',
+    CounterIntel: 'self',
+    Fortify: 'self',
     MakeExample: 'ownDefiantClient',
     Concession: 'ownDefiantClient',
     Educate: 'self',
@@ -64,6 +66,7 @@ define([
 
       this.renderRound();
       this.renderCrisisCard(gamedatas.current_crisis_card || null);
+      this.renderForecast(gamedatas.next_crisis_card || null);
       this.renderTerritories();
       this.renderHand(gamedatas.hand || []);
       this.wireMap();
@@ -157,6 +160,18 @@ define([
         node.innerHTML = this.escapeText('Crisis: ' + card.id);
       } else {
         node.innerHTML = this.escapeText('No active crisis.');
+      }
+    },
+
+    renderForecast: function(card) {
+      var node = dojo.byId('grandarea_forecast');
+      if (!node) {
+        return;
+      }
+      if (card && card.title) {
+        node.innerHTML = this.escapeText('Next crisis: ' + card.title);
+      } else {
+        node.innerHTML = this.escapeText('Next crisis: deck reshuffles');
       }
     },
 
@@ -313,6 +328,8 @@ define([
       if (action === 'Coup') return this.num(me, 'blackBudget') >= 10;
       if (action === 'FalseFlag') return this.num(me, 'blackBudget') >= 8;
       if (action === 'CovertInfluence') return this.num(me, 'blackBudget') >= 6;
+      if (action === 'CounterIntel') return this.num(me, 'blackBudget') >= 4;
+      if (action === 'Fortify') return this.num(me, 'wealth') >= 6;
       if (action === 'Invade') return this.num(me, 'armies') >= 1 && this.num(me, 'wealth') >= 12;
       if (action === 'Develop') return this.num(me, 'wealth') >= 10;
       if (action === 'RegionalRivalry') return me.type === 'Regional' && this.num(me, 'politicalCapital') >= 6;
@@ -660,6 +677,7 @@ define([
 
     notif_crisisDrawn: function(notif) {
       this.renderCrisisCard(notif.args.card || null);
+      this.renderForecast(notif.args.next_card || null);
       this.logLine(notif.args.card_id
         ? 'Crisis drawn: ' + (notif.args.card && notif.args.card.title ? notif.args.card.title : notif.args.card_id)
         : 'No crisis card available this round.');

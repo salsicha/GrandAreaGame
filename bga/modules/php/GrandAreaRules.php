@@ -396,6 +396,23 @@ class GrandAreaRules
         }
 
         $normalized = self::normalizeForResolve($actions);
+
+        // Defensive stances register (and pay) before any offensive action
+        // resolves, so their protection is independent of turn order.
+        foreach ($normalized as $entry) {
+            $family = self::str($entry, 'family');
+            if (!isset($newState[$family]) || self::isEliminated($newState[$family])) {
+                continue;
+            }
+            if ($entry['action'] === 'CounterIntel' && self::num($newState[$family], 'blackBudget') >= 4) {
+                $newState[$family]['blackBudget'] = self::num($newState[$family], 'blackBudget') - 4;
+                $newState[$family]['counterIntelActive'] = true;
+            } elseif ($entry['action'] === 'Fortify' && self::num($newState[$family], 'wealth') >= 6) {
+                $newState[$family]['wealth'] = self::num($newState[$family], 'wealth') - 6;
+                $newState[$family]['fortified'] = true;
+            }
+        }
+
         usort($normalized, function ($a, $b) use ($newState) {
             return GrandAreaRules::compareActions($a, $b, $newState);
         });
@@ -421,6 +438,12 @@ class GrandAreaRules
             if (isset($newState[$target])) {
                 self::clampTargetCommon($newState[$target]);
             }
+        }
+
+        // Stances are one-round effects; never let them leak into saved state.
+        foreach (array_keys($newState) as $key) {
+            unset($newState[$key]['counterIntelActive']);
+            unset($newState[$key]['fortified']);
         }
 
         $pressureResult = self::applyUnansweredDefiancePressure($newState);
@@ -492,25 +515,34 @@ class GrandAreaRules
                 $protectedTarget = self::truthyField($T, 'protected')
                     && self::str($T, 'protectedBy') !== ''
                     && self::str($T, 'protectedBy') !== self::str($A, 'family');
+                $fortified = self::truthyField($T, 'fortified');
                 $framing = self::spendFraming($A, $framingRequest, 'Invade', $logs);
-                $happinessLoss = max(8, 25 - $framing);
+                $happinessLoss = $fortified
+                    ? intval(ceil(max(8, 25 - $framing) / 2))
+                    : max(8, 25 - $framing);
+                $wealthDamage = $fortified ? 5 : 10;
                 $socialPenalty = max(0, 15 - intval(floor($framing / 2)));
                 $A['wealth'] = max(0, self::num($A, 'wealth') - 12);
                 $A['armies'] = max(0, self::num($A, 'armies') - 1);
-                $A['politicalCapital'] = self::num($A, 'politicalCapital') + 5;
+                if (!$fortified) {
+                    $A['politicalCapital'] = self::num($A, 'politicalCapital') + 5;
+                }
                 $T['invaded'] = true;
                 $T['protected'] = false;
                 $T['protectedBy'] = null;
                 $T['happiness'] = max(0, self::num($T, 'happiness') - $happinessLoss);
-                $T['wealth'] = max(0, self::num($T, 'wealth') - 10);
+                $T['wealth'] = max(0, self::num($T, 'wealth') - $wealthDamage);
                 $T['fear'] = min(100, max(0, self::num($T, 'fear') + 10));
                 $T['governanceChangeSentiment'] = min(100, max(0, self::num($T, 'governanceChangeSentiment') + 8));
-                if (self::str($T, 'type') === 'Client') {
+                if (self::str($T, 'type') === 'Client' && !$fortified) {
                     $T['defiance'] = self::num($T, 'defiance') + 1;
                 }
                 $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - $socialPenalty);
                 $logs[] = $actorKey . ' invaded ' . $targetKey . ($framing > 0 ? ' with framing' : ' without framing')
                     . ' (-12 wealth, -1 army, -' . $happinessLoss . ' happiness, -' . $socialPenalty . ' backlash)';
+                if ($fortified) {
+                    $logs[] = $targetKey . ' fortifications blunt the invasion (damage halved, no rally for ' . $actorKey . ')';
+                }
                 if ($protectedTarget) {
                     $A['politicalCapital'] = max(0, self::num($A, 'politicalCapital') - 5);
                     $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - 5);
@@ -782,6 +814,14 @@ class GrandAreaRules
                 }
                 $A['blackBudget'] = self::num($A, 'blackBudget') - 10;
                 $framing = self::spendFraming($A, $framingRequest, 'Coup', $logs);
+                if (self::truthyField($T, 'counterIntelActive')) {
+                    // Foiled: the op is exposed before it can roll.
+                    $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - 8);
+                    $T['politicalCapital'] = self::num($T, 'politicalCapital') + 5;
+                    $logs[] = $actorKey . "'s coup against " . $targetKey
+                        . ' was foiled by counterintelligence (exposed: -8 Social Capital; ' . $targetKey . ' +5 Political Capital)';
+                    break;
+                }
                 $ap = self::num($A, 'politicalCapital');
                 $tp = self::num($T, 'politicalCapital');
                 $sentimentPressure = (self::num($T, 'governanceChangeSentiment') + self::num($T, 'factionalDivision') - self::num($T, 'fear')) / 300.0;
@@ -796,9 +836,13 @@ class GrandAreaRules
                     $A['politicalCapital'] = self::num($A, 'politicalCapital') + 10;
                     $logs[] = $actorKey . ' successfully executed a coup against ' . $targetKey;
                 } else {
+                    // failed coup: the target rallies around the flag
                     $A['politicalCapital'] = max(0, self::num($A, 'politicalCapital') - 15);
                     $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - max(0, 20 - $framing));
+                    $T['politicalCapital'] = self::num($T, 'politicalCapital') + 5;
+                    $T['fear'] = min(100, max(0, self::num($T, 'fear') + 4));
                     $logs[] = $actorKey . ' failed coup against ' . $targetKey;
+                    $logs[] = $targetKey . ' rallies around the flag (+5 Political Capital, +4 fear)';
                 }
                 break;
             case 'FalseFlag':
@@ -820,9 +864,30 @@ class GrandAreaRules
                     break;
                 }
                 $A['blackBudget'] = self::num($A, 'blackBudget') - 6;
+                if ($targetKey !== $actorKey && self::truthyField($T, 'counterIntelActive')) {
+                    $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - 8);
+                    $T['politicalCapital'] = self::num($T, 'politicalCapital') + 5;
+                    $logs[] = $actorKey . "'s covert influence in " . $targetKey
+                        . ' was foiled by counterintelligence (exposed: -8 Social Capital; ' . $targetKey . ' +5 Political Capital)';
+                    break;
+                }
                 $T['defiance'] = self::num($T, 'defiance') + 1;
                 $A['politicalCapital'] = self::num($A, 'politicalCapital') + 5;
                 $logs[] = $actorKey . ' used CovertInfluence on ' . $targetKey . ' (defiance +1, politicalCapital +5)';
+                break;
+            case 'CounterIntel':
+                if (self::truthyField($A, 'counterIntelActive')) {
+                    $logs[] = $actorKey . ' runs counterintelligence sweeps this round';
+                } else {
+                    $logs[] = $actorKey . ' failed CounterIntel (insufficient Black Budget)';
+                }
+                break;
+            case 'Fortify':
+                if (self::truthyField($A, 'fortified')) {
+                    $logs[] = $actorKey . ' fortifies against invasion this round';
+                } else {
+                    $logs[] = $actorKey . ' failed Fortify (insufficient wealth)';
+                }
                 break;
             case 'MakeExample':
                 if (!$hasT) {

@@ -236,7 +236,7 @@ test('actions are consolidated into the turn manager', () => {
   assert.doesNotMatch(app, /function wireButtons\(/);
   assert.doesNotMatch(app, /action-skim|action-prop|action-invade/);
   assert.doesNotMatch(html, /id=["']actions["']|action-skim|action-prop|action-invade/);
-  assert.match(app, /const ACTIONS = \['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','MakeExample','Concession','Educate','Develop'\]/);
+  assert.match(app, /const ACTIONS = \['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','CounterIntel','Fortify','MakeExample','Concession','Educate','Develop'\]/);
   assert.match(app, /const ROUND_PHASES = \['Crisis','Tribute','Secret Action Submission','Reveal','Narrative Battle','Resolution','Cleanup'\]/);
   assert.match(app, /phases: ROUND_PHASES\.slice\(\)/);
 });
@@ -1499,6 +1499,67 @@ test('a successful coup resets the defiance-majority counter', () => {
   const result = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Coup', target: 'Beta' }]);
   assert.equal(result.newState.Beta.family, 'AlphaFamily');
   assert.equal(result.newState.Beta.defianceMajorityRounds, 0);
+});
+
+test('counterintelligence foils coups and covert influence', () => {
+  const Rules = loadRules([0.1]);
+  const state = {
+    Plotter: territory({ family: 'PlotterFam', blackBudget: 20, politicalCapital: 100, socialCapital: 50 }),
+    Wary: territory({ family: 'WaryFam', blackBudget: 10, politicalCapital: 50, socialCapital: 50 })
+  };
+
+  const result = Rules.resolveTurn(state, [
+    { family: 'Plotter', action: 'Coup', target: 'Wary' },
+    { family: 'Wary', action: 'CounterIntel', target: 'Self' }
+  ]);
+  assert.equal(result.newState.Wary.family, 'WaryFam');
+  assert.equal(result.newState.Wary.blackBudget, 6);
+  assert.equal(result.newState.Wary.politicalCapital, 55);
+  assert.equal(result.newState.Plotter.blackBudget, 10);
+  assert.equal(result.newState.Plotter.socialCapital, 42);
+  assert.ok(result.logs.some(line => line.includes('foiled by counterintelligence')));
+  assert.equal(result.newState.Wary.counterIntelActive, undefined);
+
+  const covert = Rules.resolveTurn(state, [
+    { family: 'Plotter', action: 'CovertInfluence', target: 'Wary' },
+    { family: 'Wary', action: 'CounterIntel', target: 'Self' }
+  ]);
+  assert.equal(covert.newState.Wary.defiance, 0);
+  assert.equal(covert.newState.Plotter.socialCapital, 42);
+});
+
+test('fortify blunts invasions and self-covert-influence is never foiled', () => {
+  const Rules = loadRules();
+  const invasion = Rules.resolveTurn({
+    Raider: territory({ family: 'RaiderFam', wealth: 100, armies: 2, socialCapital: 50, politicalCapital: 50 }),
+    Bunker: territory({ family: 'BunkerFam', type: 'Client', clientOf: 'RaiderFam', wealth: 80, happiness: 100, defiance: 0 })
+  }, [
+    { family: 'Raider', action: 'Invade', target: 'Bunker' },
+    { family: 'Bunker', action: 'Fortify', target: 'Self' }
+  ]);
+  assert.equal(invasion.newState.Bunker.happiness, 87); // ceil(25/2) = 13 instead of 25
+  assert.equal(invasion.newState.Bunker.wealth, 80 - 6 - 5); // fortify cost + halved damage
+  assert.equal(invasion.newState.Bunker.defiance, 0);
+  assert.equal(invasion.newState.Raider.politicalCapital, 50); // no rally for the invader
+  assert.equal(invasion.newState.Bunker.fortified, undefined);
+
+  const selfStoke = Rules.resolveTurn({
+    Rebel: territory({ family: 'RebelFam', type: 'Client', clientOf: 'USA', blackBudget: 12, politicalCapital: 50 })
+  }, [{ family: 'Rebel', action: 'CovertInfluence', target: 'Self' }]);
+  assert.equal(selfStoke.newState.Rebel.defiance, 1);
+});
+
+test('a failed coup rallies the target', () => {
+  const Rules = loadRules([0.99]);
+  const state = {
+    Alpha: territory({ family: 'AlphaFamily', politicalCapital: 50, socialCapital: 80 }),
+    Beta: territory({ family: 'BetaFamily', politicalCapital: 50, happiness: 90, fear: 10 })
+  };
+  const result = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Coup', target: 'Beta' }]);
+  assert.equal(result.newState.Beta.family, 'BetaFamily');
+  assert.equal(result.newState.Beta.politicalCapital, 55);
+  assert.equal(result.newState.Beta.fear, 14);
+  assert.ok(result.logs.some(line => line.includes('rallies around the flag')));
 });
 
 test('BGA module matches the Studio project layout', () => {

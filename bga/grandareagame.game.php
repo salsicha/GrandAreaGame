@@ -139,6 +139,7 @@ class GrandAreaGame extends Table
         self::notifyAllPlayers('crisisDrawn', '', array(
             'card_id' => $cardId,
             'card' => $cardId !== null ? $this->crisisCardById($cardId) : null,
+            'next_card' => count($draw) > 0 ? $this->crisisCardById($draw[0]) : null,
             'round' => intval(self::getGameStateValue('round_number'))
         ));
 
@@ -596,6 +597,9 @@ class GrandAreaGame extends Table
         $result['current_crisis'] = $this->loadRuntime('current_crisis', null);
         $crisisId = $result['current_crisis'];
         $result['current_crisis_card'] = $crisisId !== null ? $this->crisisCardById($crisisId) : null;
+        // The upcoming crisis is public knowledge: everyone sees the storm coming.
+        $draw = $this->loadRuntime('crisis_draw', array());
+        $result['next_crisis_card'] = count($draw) > 0 ? $this->crisisCardById($draw[0]) : null;
         // Public material the client needs for rendering (no hidden info).
         $result['card_defs'] = $this->playerCardMaterial;
         $result['allowed_actions'] = $this->allowedActions;

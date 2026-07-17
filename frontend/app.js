@@ -370,10 +370,11 @@ function renderCrisisUI(){
   const desc = q('current-crisis-desc');
   if(!el) return;
   if(cur){ el.querySelector('strong').textContent = cur.title; desc.textContent = cur.description || '';} else { el.querySelector('strong').textContent = 'No card drawn'; desc.textContent = ''; }
-  // show counts
-  const pileCount = (gameState.runtime.crisisDeck && gameState.runtime.crisisDeck.drawPile.length) || 0;
+  // show counts and the public forecast: the next crisis is face-up
+  const drawPile = (gameState.runtime.crisisDeck && gameState.runtime.crisisDeck.drawPile) || [];
   const discCount = (gameState.runtime.crisisDeck && gameState.runtime.crisisDeck.discard.length) || 0;
-  const meta = el.querySelector('.meta') || document.createElement('div'); meta.className = 'meta'; meta.textContent = `Deck: ${pileCount} · Discard: ${discCount}`;
+  const upcoming = drawPile.length ? drawPile[0].title : 'none';
+  const meta = el.querySelector('.meta') || document.createElement('div'); meta.className = 'meta'; meta.textContent = `Next crisis: ${upcoming} · Deck: ${drawPile.length} · Discard: ${discCount}`;
   if(!el.querySelector('.meta')) el.appendChild(meta);
 }
 
@@ -487,7 +488,7 @@ function renderBriefcase(){
 // ----------------------- Turn manager functions -----------------------
 function idFromKey(key){ return `p_${key.replace(/\W+/g,'_')}` }
 
-const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','MakeExample','Concession','Educate','Develop'];
+const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','CounterIntel','Fortify','MakeExample','Concession','Educate','Develop'];
 
 const ACTION_RULES = {
   Pass: { target: 'self', cost: 'None', effect: 'No effect.' },
@@ -505,6 +506,8 @@ const ACTION_RULES = {
   Coup: { target: 'other', cost: '10 Black Budget', effect: 'Seeded coup roll can replace target family control.' },
   FalseFlag: { target: 'self', cost: '8 Black Budget', effect: 'Gain 50 Social Capital.' },
   CovertInfluence: { target: 'any', cost: '6 Black Budget', effect: 'Target defiance +1; actor Political Capital +5. Self-target stokes deliberate defiance.' },
+  CounterIntel: { target: 'self', cost: '4 Black Budget', effect: 'Stance: foils coups and covert influence against you this round; attackers are exposed.' },
+  Fortify: { target: 'self', cost: '6 wealth', effect: 'Stance: invasions against you this round are blunted (damage halved, no defiance, no rally).' },
   MakeExample: { target: 'ownDefiantClient', cost: '10 Social Capital', effect: 'Reset own client defiance; target happiness -20.' },
   Concession: { target: 'ownDefiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset own client defiance; target happiness +10.' },
   Educate: { target: 'self', cost: '8 wealth', effect: 'Education +10, development +3, political side pressure.' },
@@ -521,6 +524,8 @@ function isActionLegal(family, action){
   if(action === 'Coup') return (data.blackBudget||0) >= 10;
   if(action === 'FalseFlag') return (data.blackBudget||0) >= 8;
   if(action === 'CovertInfluence') return (data.blackBudget||0) >= 6;
+  if(action === 'CounterIntel') return (data.blackBudget||0) >= 4;
+  if(action === 'Fortify') return (data.wealth||0) >= 6;
   if(action === 'Invade') return (data.armies||0) >= 1 && (data.wealth||0) >= 12;
   if(action === 'Develop') return (data.wealth||0) >= 10 && hasDevelopmentResource(family);
   if(action === 'RegionalRivalry') return data.type === 'Regional' && (data.politicalCapital||0) >= 6;

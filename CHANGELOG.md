@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Depth pass — counterplay and planning for the secret-action phase:
+  - New defensive stances: `CounterIntel` (4 Black Budget; foils coups and covert influence against you for the round, exposing the attacker for 8 Social Capital and granting +5 Political Capital per foiled op) and `Fortify` (6 wealth; invasions are blunted — damage halved, no defiance bump, no invader rally). Stances register before any attack resolves regardless of turn order, are one-round only, and are wasted if nobody attacks — bluffing is the point.
+  - Failed coups now rally the target around the flag (+5 Political Capital, +4 fear), making coups a real gamble.
+  - The next crisis card is public knowledge in every surface (frontend deck panel, playtest observations, BGA panel and notifications), turning crises into strategic weather players position around.
+  - Implemented across the JS engine, PHP port (14-scenario cross-engine parity verified), frontend turn manager, playtest adapter, and BGA client; documented in RULES.md ("Defensive Stances").
 - Gameplay balance overhaul — games are now decided by play, not entropy (validated across a 10-seed × 25-round deterministic sweep: seats alive at end 0.2→9.5 of 10, winners in half the games across all three roles, deaths per 10 games 100→5):
   - New cleanup recovery step: development-scaled wealth production, a capped stash trickle, slow Social/Political Capital regeneration while happiness holds, and low-end happiness recovery.
   - Head defiant-majority loss now counts only the Head's own clients, needs at least 2 defiant, and must stand for 2 consecutive cleanups; the Head win (wealth 400) likewise only requires the Head's own clients to be compliant.

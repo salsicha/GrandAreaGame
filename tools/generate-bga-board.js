@@ -32,6 +32,7 @@ ${svg.split('\n').map(line => (line.length ? '      ' + line : line)).join('\n')
     <div id="grandarea_phase" class="grandarea-panel-row"></div>
     <div id="grandarea_round" class="grandarea-panel-row"></div>
     <div id="grandarea_crisis" class="grandarea-panel-row"></div>
+    <div id="grandarea_forecast" class="grandarea-panel-row"></div>
     <div id="grandarea_selected" class="grandarea-panel-block"></div>
     <div id="grandarea_action_builder" class="grandarea-panel-block">
       <div class="grandarea-field">
