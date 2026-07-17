@@ -191,11 +191,12 @@ class GrandAreaGame extends Table
 
     public function stNarrativeBattle()
     {
-        // Table-talk phase: no server-side effect in the current ruleset.
+        $this->persistRuntime('narrative_plays', array());
         self::notifyAllPlayers('narrativeBattle', '', array(
             'round' => intval(self::getGameStateValue('round_number'))
         ));
-        $this->gamestate->nextState('next');
+        // Every living player may make one narrative play or pass.
+        $this->gamestate->setPlayersMultiactive($this->livingPlayerIds(), 'next', true);
     }
 
     public function stResolution()
@@ -379,6 +380,51 @@ class GrandAreaGame extends Table
         $this->notifyHandCounts();
     }
 
+    public function submitSpin($stance, $target)
+    {
+        self::checkAction('submitSpin');
+
+        if ($stance !== 'smear' && $stance !== 'whitewash') {
+            throw new BgaUserException('Unknown narrative stance');
+        }
+
+        $playerId = intval(self::getCurrentPlayerId());
+        $state = $this->loadTerritoryState();
+        $family = $this->familyForPlayer($playerId);
+        $actorKey = $this->actorTerritoryKey($state, $family);
+        if ($actorKey === null) {
+            throw new BgaUserException('Your family has been eliminated and cannot act');
+        }
+
+        $targetKey = strval($target);
+        if (!isset($state[$targetKey]) || GrandAreaRules::isEliminated($state[$targetKey])) {
+            throw new BgaUserException('Unknown or eliminated target territory');
+        }
+        if ($stance === 'smear' && $targetKey === $actorKey) {
+            throw new BgaUserException('You cannot smear your own story');
+        }
+        if (GrandAreaRules::fieldNum($state[$actorKey], 'socialCapital') < 4) {
+            throw new BgaUserException('A narrative play costs 4 Social Capital');
+        }
+
+        $plays = $this->loadRuntime('narrative_plays', array());
+        if (isset($plays[$actorKey])) {
+            throw new BgaUserException('You already made a narrative play this round');
+        }
+        $plays[$actorKey] = array('family' => $actorKey, 'stance' => $stance, 'target' => $targetKey);
+        $this->persistRuntime('narrative_plays', $plays);
+
+        // Spin is public rhetoric: everyone hears it immediately.
+        self::notifyAllPlayers('spinSubmitted', '', array(
+            'player_id' => $playerId,
+            'family' => $actorKey,
+            'stance' => $stance,
+            'target' => $targetKey
+        ));
+
+        $this->gamestate->setPlayerNonMultiactive($playerId, 'next');
+    }
+
     public function endTurn()
     {
         self::checkAction('endTurn');
@@ -474,11 +520,13 @@ class GrandAreaGame extends Table
 
         $crisisId = $this->loadRuntime('current_crisis', null);
         $crisisCard = $crisisId !== null ? $this->crisisCardById($crisisId) : null;
+        $narrative = array_values($this->loadRuntime('narrative_plays', array()));
 
         $state = $this->loadTerritoryState();
-        $resolution = GrandAreaRules::resolveTurn($state, $actions, $seed, $crisisCard);
+        $resolution = GrandAreaRules::resolveTurn($state, $actions, $seed, $crisisCard, $narrative);
         $this->persistTerritoryState($resolution['newState']);
         $this->persistRuntime('revealed_payloads', $actions);
+        $this->persistRuntime('narrative_plays', array());
 
         // The applied crisis card cycles to the discard so reshuffles work.
         if ($crisisId !== null) {

@@ -44,6 +44,15 @@ class action_grandareagame extends APP_GameAction
         self::ajaxResponse();
     }
 
+    public function submitSpin()
+    {
+        self::setAjaxMode();
+        $stance = self::getArg('stance', AT_alphanum, true);
+        $target = self::getArg('target', AT_alphanum, true);
+        $this->game->submitSpin($stance, $target);
+        self::ajaxResponse();
+    }
+
     public function endTurn()
     {
         self::setAjaxMode();

@@ -61,9 +61,11 @@ $machinestates = array(
     ),
     ST_NARRATIVE_BATTLE => array(
         'name' => 'narrativeBattle',
-        'description' => clienttranslate('Narrative battle'),
-        'type' => 'game',
+        'description' => clienttranslate('Narrative battle: spin the revealed stories'),
+        'descriptionmyturn' => clienttranslate('Smear or whitewash a revealed story, or pass'),
+        'type' => 'multipleactiveplayer',
         'action' => 'stNarrativeBattle',
+        'possibleactions' => array('submitSpin', 'endTurn'),
         'transitions' => array('next' => ST_RESOLUTION)
     ),
     ST_RESOLUTION => array(

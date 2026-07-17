@@ -197,6 +197,18 @@ Major actions are balanced around cost, target damage, and political side effect
 - `DebtShakedown` costs Political Capital, converts target wealth into actor wealth, raises target debt, lowers happiness, and creates backlash.
 - `EconomicExploitation` costs Social Capital, extracts wealth and stash value, lowers target development and happiness, and creates backlash.
 
+## Narrative Battle
+
+After actions are revealed and before they resolve, each family may make one narrative play for `4` Social Capital — the fight over how the world reads the round.
+
+- `Smear` targets another family: they immediately lose `3` Political Capital, and their revealed action resolves with `8` less effective framing (an invasion or coup plays uglier: more backlash, more damage).
+- `Whitewash` targets any family, including yourself: they immediately gain `2` Social Capital, and their action resolves with `8` more effective framing (sanitized coverage).
+- Effective framing is the actor's own framing spend plus all spin adjustments, clamped between `0` and `50`. Spin adjustments never cost the actor extra Social Capital; only the spinner pays.
+- Multiple plays against the same story stack. Plays against eliminated families fizzle. Spin is public: everyone hears who smeared whom.
+- Passing is always allowed — but a round where nobody contests the story is a round the aggressors write it.
+
+The BGA module runs this as a real phase after the reveal. The browser prototype collects spin choices alongside action submissions for one-host convenience; the arithmetic is identical.
+
 ## Defensive Stances
 
 Stances are secret actions that spend your turn on protection instead of progress. They register before any offensive action resolves, regardless of turn order, and last only for the round they are played — so they reward reading your rivals and punish paranoia.

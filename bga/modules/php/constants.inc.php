@@ -76,6 +76,22 @@ if (!function_exists('grandarea_defiance_pressure')) {
     }
 }
 
+if (!function_exists('grandarea_narrative')) {
+    /**
+     * Narrative-battle tuning. Must stay in sync with NARRATIVE in
+     * frontend/rules.js (the reference engine).
+     */
+    function grandarea_narrative()
+    {
+        return array(
+            'cost' => 4,
+            'framingSwing' => 8,
+            'smearPoliticalPenalty' => 3,
+            'whitewashSocialGain' => 2
+        );
+    }
+}
+
 if (!defined('GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR')) {
     define('GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR', 50);
 }

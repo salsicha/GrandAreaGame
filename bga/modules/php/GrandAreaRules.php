@@ -383,7 +383,7 @@ class GrandAreaRules
      *
      * $crisis is an optional crisis card definition (already drawn).
      */
-    public static function resolveTurn($state, $actions, $seed, $crisis = null)
+    public static function resolveTurn($state, $actions, $seed, $crisis = null, $narrative = array())
     {
         $logs = array('Using replay seed: ' . $seed);
         $newState = self::cloneTerritories($state);
@@ -413,6 +413,63 @@ class GrandAreaRules
             }
         }
 
+        // Narrative battle: post-reveal spin plays adjust how the world reads
+        // each revealed action. One play per family, paid in Social Capital,
+        // processed in sorted family order for determinism.
+        $tuning = grandarea_narrative();
+        $framingAdjustments = array();
+        $narrativePlayed = array();
+        $plays = array();
+        foreach ((is_array($narrative) ? $narrative : array()) as $play) {
+            if (!is_array($play)) {
+                continue;
+            }
+            $stance = self::str($play, 'stance');
+            if (self::str($play, 'family') === '' || self::str($play, 'target') === ''
+                || ($stance !== 'smear' && $stance !== 'whitewash')) {
+                continue;
+            }
+            $plays[] = $play;
+        }
+        usort($plays, function ($a, $b) {
+            return strcmp(strval($a['family']), strval($b['family']));
+        });
+        foreach ($plays as $play) {
+            $family = self::str($play, 'family');
+            $target = self::str($play, 'target');
+            $stance = self::str($play, 'stance');
+            if (!isset($newState[$family]) || self::isEliminated($newState[$family])) {
+                continue;
+            }
+            if (isset($narrativePlayed[$family])) {
+                $logs[] = $family . ' already made a narrative play this round';
+                continue;
+            }
+            if (!isset($newState[$target]) || self::isEliminated($newState[$target])) {
+                $logs[] = $family . ' failed a narrative play (no such story to spin)';
+                continue;
+            }
+            if ($stance === 'smear' && $target === $family) {
+                $logs[] = $family . ' failed Smear (cannot smear yourself)';
+                continue;
+            }
+            if (self::num($newState[$family], 'socialCapital') < $tuning['cost']) {
+                $logs[] = $family . ' failed a narrative play (insufficient Social Capital)';
+                continue;
+            }
+            $newState[$family]['socialCapital'] = self::num($newState[$family], 'socialCapital') - $tuning['cost'];
+            $narrativePlayed[$family] = true;
+            if ($stance === 'smear') {
+                $framingAdjustments[$target] = (isset($framingAdjustments[$target]) ? $framingAdjustments[$target] : 0) - $tuning['framingSwing'];
+                $newState[$target]['politicalCapital'] = max(0, self::num($newState[$target], 'politicalCapital') - $tuning['smearPoliticalPenalty']);
+                $logs[] = $family . " smears " . $target . "'s story (-" . $tuning['smearPoliticalPenalty'] . ' Political Capital, framing -' . $tuning['framingSwing'] . ')';
+            } else {
+                $framingAdjustments[$target] = (isset($framingAdjustments[$target]) ? $framingAdjustments[$target] : 0) + $tuning['framingSwing'];
+                $newState[$target]['socialCapital'] = self::num($newState[$target], 'socialCapital') + $tuning['whitewashSocialGain'];
+                $logs[] = $family . " whitewashes " . $target . "'s story (+" . $tuning['whitewashSocialGain'] . ' Social Capital, framing +' . $tuning['framingSwing'] . ')';
+            }
+        }
+
         usort($normalized, function ($a, $b) use ($newState) {
             return GrandAreaRules::compareActions($a, $b, $newState);
         });
@@ -433,7 +490,8 @@ class GrandAreaRules
                 continue;
             }
 
-            self::resolveAction($newState, $actor, $action, $target, $entry['framing'], $seed, $idx, $logs);
+            $framingAdjust = isset($framingAdjustments[$actor]) ? $framingAdjustments[$actor] : 0;
+            self::resolveAction($newState, $actor, $action, $target, $entry['framing'], $seed, $idx, $logs, $framingAdjust);
             self::clampActorCommon($newState[$actor]);
             if (isset($newState[$target])) {
                 self::clampTargetCommon($newState[$target]);
@@ -465,7 +523,7 @@ class GrandAreaRules
         );
     }
 
-    private static function resolveAction(&$state, $actorKey, $action, $targetKey, $framingRequest, $seed, $idx, &$logs)
+    private static function resolveAction(&$state, $actorKey, $action, $targetKey, $framingRequest, $seed, $idx, &$logs, $framingAdjust = 0)
     {
         $A =& $state[$actorKey];
         $hasT = isset($state[$targetKey]);
@@ -516,7 +574,7 @@ class GrandAreaRules
                     && self::str($T, 'protectedBy') !== ''
                     && self::str($T, 'protectedBy') !== self::str($A, 'family');
                 $fortified = self::truthyField($T, 'fortified');
-                $framing = self::spendFraming($A, $framingRequest, 'Invade', $logs);
+                $framing = max(0, min(50, self::spendFraming($A, $framingRequest, 'Invade', $logs) + $framingAdjust));
                 $happinessLoss = $fortified
                     ? intval(ceil(max(8, 25 - $framing) / 2))
                     : max(8, 25 - $framing);
@@ -813,7 +871,7 @@ class GrandAreaRules
                     break;
                 }
                 $A['blackBudget'] = self::num($A, 'blackBudget') - 10;
-                $framing = self::spendFraming($A, $framingRequest, 'Coup', $logs);
+                $framing = max(0, min(50, self::spendFraming($A, $framingRequest, 'Coup', $logs) + $framingAdjust));
                 if (self::truthyField($T, 'counterIntelActive')) {
                     // Foiled: the op is exposed before it can roll.
                     $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - 8);

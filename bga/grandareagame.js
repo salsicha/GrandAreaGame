@@ -99,6 +99,10 @@ define([
       } else if (stateName === 'reveal') {
         this.addActionButton('btn_ga_reveal', _('Reveal committed action'), 'onRevealClick');
         this.addActionButton('btn_ga_skip', _('End turn'), 'onEndTurnClick', null, false, 'gray');
+      } else if (stateName === 'narrativeBattle') {
+        this.addActionButton('btn_ga_smear', _('Smear selected territory'), 'onSmearClick', null, false, 'red');
+        this.addActionButton('btn_ga_whitewash', _('Whitewash selected territory'), 'onWhitewashClick');
+        this.addActionButton('btn_ga_spin_skip', _('Pass'), 'onEndTurnClick', null, false, 'gray');
       }
     },
 
@@ -575,6 +579,39 @@ define([
       }, this, function() {}, function() {});
     },
 
+    onSmearClick: function(evt) {
+      if (evt) {
+        dojo.stopEvent(evt);
+      }
+      this.submitSpin('smear');
+    },
+
+    onWhitewashClick: function(evt) {
+      if (evt) {
+        dojo.stopEvent(evt);
+      }
+      this.submitSpin('whitewash');
+    },
+
+    submitSpin: function(stance) {
+      if (!this.checkAction('submitSpin', true)) {
+        return;
+      }
+      if (!this.selectedTerritory) {
+        this.showMessage(_('Select the territory whose story you want to spin.'), 'error');
+        return;
+      }
+      if (stance === 'smear' && this.selectedTerritory === this.myActorKey()) {
+        this.showMessage(_('You cannot smear your own story.'), 'error');
+        return;
+      }
+      this.ajaxcall('/grandareagame/grandareagame/submitSpin.html', {
+        lock: true,
+        stance: stance,
+        target: this.selectedTerritory
+      }, this, function() {}, function() {});
+    },
+
     onEndTurnClick: function(evt) {
       if (evt) {
         dojo.stopEvent(evt);
@@ -663,6 +700,7 @@ define([
       dojo.subscribe('actionSubmissionOpen', this, 'notif_actionSubmissionOpen');
       dojo.subscribe('revealOpen', this, 'notif_revealOpen');
       dojo.subscribe('narrativeBattle', this, 'notif_narrativeBattle');
+      dojo.subscribe('spinSubmitted', this, 'notif_spinSubmitted');
       dojo.subscribe('commitSubmitted', this, 'notif_commitSubmitted');
       dojo.subscribe('playerRevealed', this, 'notif_playerRevealed');
       dojo.subscribe('playerEndedTurn', this, 'notif_playerEndedTurn');
@@ -697,7 +735,13 @@ define([
     },
 
     notif_narrativeBattle: function(notif) {
-      this.logLine('Narrative battle: make your case at the table.');
+      this.logLine('Narrative battle: spin a revealed story or pass.');
+    },
+
+    notif_spinSubmitted: function(notif) {
+      var args = notif.args || {};
+      this.logLine((args.family || 'A player') + ' ' + (args.stance === 'smear' ? 'smears' : 'whitewashes')
+        + ' ' + (args.target || 'a story') + '.');
     },
 
     notif_commitSubmitted: function(notif) {

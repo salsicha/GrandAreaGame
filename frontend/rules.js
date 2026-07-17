@@ -39,6 +39,13 @@
     politicalCapPerResolution: 9
   };
 
+  const NARRATIVE = {
+    cost: 4,
+    framingSwing: 8,
+    smearPoliticalPenalty: 3,
+    whitewashSocialGain: 2
+  };
+
   const UPRISING_HAPPINESS_SAFE_FLOOR = 50;
   const HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE = 2;
 
@@ -609,6 +616,37 @@
       }
     });
 
+    // Narrative battle: post-reveal spin plays adjust how the world reads
+    // each revealed action. One play per family, paid in Social Capital,
+    // processed in sorted family order for determinism.
+    const framingAdjustments = {};
+    const narrativePlayed = {};
+    const narrativePlays = (options && Array.isArray(options.narrative)) ? options.narrative.slice() : [];
+    narrativePlays
+      .filter(play=>play && play.family && play.target && (play.stance === 'smear' || play.stance === 'whitewash'))
+      .sort((a,b)=>String(a.family).localeCompare(String(b.family)))
+      .forEach(play=>{
+        const S = newState[play.family];
+        const T = newState[play.target];
+        if(!S || isEliminated(S)){ return; }
+        if(narrativePlayed[play.family]){ logs.push(`${play.family} already made a narrative play this round`); return; }
+        if(!T || isEliminated(T)){ logs.push(`${play.family} failed a narrative play (no such story to spin)`); return; }
+        if(play.stance === 'smear' && play.target === play.family){ logs.push(`${play.family} failed Smear (cannot smear yourself)`); return; }
+        if((S.socialCapital||0) < NARRATIVE.cost){ logs.push(`${play.family} failed a narrative play (insufficient Social Capital)`); return; }
+        S.socialCapital = (S.socialCapital||0) - NARRATIVE.cost;
+        narrativePlayed[play.family] = true;
+        if(play.stance === 'smear'){
+          framingAdjustments[play.target] = (framingAdjustments[play.target]||0) - NARRATIVE.framingSwing;
+          T.politicalCapital = clamp((T.politicalCapital||0) - NARRATIVE.smearPoliticalPenalty, 0);
+          logs.push(`${play.family} smears ${play.target}'s story (-${NARRATIVE.smearPoliticalPenalty} Political Capital, framing -${NARRATIVE.framingSwing})`);
+        } else {
+          framingAdjustments[play.target] = (framingAdjustments[play.target]||0) + NARRATIVE.framingSwing;
+          T.socialCapital = (T.socialCapital||0) + NARRATIVE.whitewashSocialGain;
+          logs.push(`${play.family} whitewashes ${play.target}'s story (+${NARRATIVE.whitewashSocialGain} Social Capital, framing +${NARRATIVE.framingSwing})`);
+        }
+      });
+    const effectiveFraming = (actorKey, spent)=>clamp(spent + (framingAdjustments[actorKey]||0), 0, 50);
+
     normalized.sort((a,b)=>compareActions(a, b, newState));
     logs.push('Resolving actions (wealth, role, action priority, family id)');
 
@@ -655,7 +693,7 @@
             if((A.wealth||0) < wealthCost){ logs.push(`${actor} failed Invade (insufficient wealth)`); break; }
             const protectedTarget = !!T.protected && T.protectedBy && T.protectedBy !== A.family;
             const fortified = !!T.fortified;
-            const framing = spendFraming(A, entry.framing, 'Invade', logs);
+            const framing = effectiveFraming(actor, spendFraming(A, entry.framing, 'Invade', logs));
             const happinessLoss = fortified ? Math.ceil(Math.max(8, 25 - framing) / 2) : Math.max(8, 25 - framing);
             const wealthDamage = fortified ? 5 : 10;
             const socialPenalty = Math.max(0, 15 - Math.floor(framing / 2));
@@ -863,7 +901,7 @@
           const coupCost = 10;
           if((A.blackBudget||0) < coupCost){ logs.push(`${actor} failed Coup (insufficient Black Budget)`); break; }
           A.blackBudget = (A.blackBudget||0) - coupCost;
-          const framing = spendFraming(A, entry.framing, 'Coup', logs);
+          const framing = effectiveFraming(actor, spendFraming(A, entry.framing, 'Coup', logs));
           if(T.counterIntelActive){
             // Foiled: the op is exposed before it can roll.
             A.socialCapital = clamp((A.socialCapital||0) - 8, 0);
@@ -1260,5 +1298,5 @@
     return { newState, logs };
   }
 
-  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
+  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, NARRATIVE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
 })();

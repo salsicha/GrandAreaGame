@@ -9,6 +9,7 @@ const gameState = {
     hands: {},
     deck: [],
     pendingActions: {},
+    pendingSpins: {},
     locks: {},
     submissions: {}
   },
@@ -276,6 +277,7 @@ async function init(){
   await loadMap();
   // game flow state
   gameState.runtime.pendingActions = {}; // family -> {action,target,locked}
+  gameState.runtime.pendingSpins = {}; // family -> {stance,target}
   gameState.runtime.locks = {};
   gameState.runtime.submissions = {}; // family -> {sealed:true, revealed:false}
   window.game = gameState;
@@ -653,6 +655,15 @@ function renderPlayersList(){
     const framingInput = document.createElement('input'); framingInput.id = `framing-${idFromKey(family)}`; framingInput.type = 'number'; framingInput.min = '0'; framingInput.max = '50'; framingInput.step = '1'; framingInput.value = '0'; framingInput.title = 'Social Capital to spend on framing';
     framingInput.className = 'framing';
     framingInput.setAttribute('aria-label', `${family} framing spend`);
+    // Narrative battle: one spin play per family (4 Social Capital)
+    const spinSel = document.createElement('select'); spinSel.id = `spin-${idFromKey(family)}`;
+    spinSel.setAttribute('aria-label', `${family} narrative play`);
+    spinSel.title = 'Narrative battle: smear or whitewash a revealed story (4 Social Capital)';
+    [['none', 'No spin'], ['smear', 'Smear'], ['whitewash', 'Whitewash']].forEach(([value, label])=>{
+      const o = document.createElement('option'); o.value = value; o.textContent = label; spinSel.appendChild(o);
+    });
+    const spinTargetSel = document.createElement('select'); spinTargetSel.id = `spin-target-${idFromKey(family)}`;
+    spinTargetSel.setAttribute('aria-label', `${family} narrative target`);
     const lockBtn = document.createElement('button'); lockBtn.textContent='Lock'; lockBtn.id = `lock-${idFromKey(family)}`;
     const submitBtn = document.createElement('button'); submitBtn.textContent='Submit Secret'; submitBtn.id = `submit-${idFromKey(family)}`;
     const preview = document.createElement('div'); preview.className = 'preview';
@@ -665,6 +676,22 @@ function renderPlayersList(){
     if(submitted){
       submitBtn.textContent = 'Submitted';
     }
+
+    populateSpinTargets(spinTargetSel, family, spinSel.value);
+    // restore existing pending spin if any
+    const pendingSpin = gameState.runtime.pendingSpins[family];
+    if(pendingSpin){
+      spinSel.value = pendingSpin.stance || 'none';
+      populateSpinTargets(spinTargetSel, family, spinSel.value);
+      if(pendingSpin.target) spinTargetSel.value = pendingSpin.target;
+    }
+    spinSel.addEventListener('change', ()=>{
+      populateSpinTargets(spinTargetSel, family, spinSel.value);
+      updateSpin(family, spinSel.value, spinTargetSel.value);
+    });
+    spinTargetSel.addEventListener('change', ()=>{
+      updateSpin(family, spinSel.value, spinTargetSel.value);
+    });
 
     // restore existing pending action if any
     const pending = gameState.runtime.pendingActions[family];
@@ -697,7 +724,7 @@ function renderPlayersList(){
     if(gameState.runtime.submissions && gameState.runtime.submissions[family] && viewer && viewer !== family){
       const badge = document.createElement('div'); badge.textContent = 'Submitted'; badge.className = 'submitted-badge'; row.appendChild(name); row.appendChild(badge);
     } else {
-      row.appendChild(name); row.appendChild(actionSel); row.appendChild(targetSel); row.appendChild(framingInput); row.appendChild(lockBtn); row.appendChild(submitBtn); row.appendChild(preview);
+      row.appendChild(name); row.appendChild(actionSel); row.appendChild(targetSel); row.appendChild(framingInput); row.appendChild(spinSel); row.appendChild(spinTargetSel); row.appendChild(lockBtn); row.appendChild(submitBtn); row.appendChild(preview);
     }
     container.appendChild(row);
   });
@@ -710,6 +737,27 @@ function normalizeFraming(value){
   const n = Number(value);
   if(!Number.isFinite(n)) return 0;
   return Math.max(0, Math.floor(n));
+}
+
+function populateSpinTargets(spinTargetSel, family, stance){
+  const current = spinTargetSel.value;
+  spinTargetSel.innerHTML = '';
+  spinTargetSel.disabled = stance === 'none';
+  const targets = territoryKeys().filter(k=>!(stance === 'smear' && k === family));
+  targets.forEach(k=>{
+    const o = document.createElement('option'); o.value = k; o.textContent = k; spinTargetSel.appendChild(o);
+  });
+  if(targets.includes(current)) spinTargetSel.value = current;
+}
+
+function updateSpin(family, stance, target){
+  if(stance === 'none'){
+    delete gameState.runtime.pendingSpins[family];
+    log(`${family}: no narrative play`);
+    return;
+  }
+  gameState.runtime.pendingSpins[family] = { stance, target };
+  log(`${family}: will ${stance} ${target}'s story (4 Social Capital)`);
 }
 
 function submitAction(family, action, target, framing=0){
@@ -756,6 +804,7 @@ function advancePhase(){
 
 function resetRound(){
   gameState.runtime.pendingActions = {};
+  gameState.runtime.pendingSpins = {};
   gameState.runtime.locks = {};
   gameState.runtime.submissions = {};
   // full re-render restores every row's controls, labels, and enabled state
@@ -801,11 +850,19 @@ function resolveSubmittedActions(families){
     target: (gameState.runtime.pendingActions[k] && gameState.runtime.pendingActions[k].target) || 'Self',
     framing: (gameState.runtime.pendingActions[k] && gameState.runtime.pendingActions[k].framing) || 0
   }));
-  const seed = JSON.stringify({ round: gameState.round, actions });
+  // collect narrative plays (one spin per family)
+  const narrative = [];
+  families.forEach(k=>{
+    const spin = gameState.runtime.pendingSpins[k];
+    if(spin && spin.stance && spin.stance !== 'none' && spin.target){
+      narrative.push({ family: k, stance: spin.stance, target: spin.target });
+    }
+  });
+  const seed = JSON.stringify({ round: gameState.round, actions, narrative });
   gameState.runtime.lastResolutionSeed = seed;
   // send actions to rules engine
   if(!window.Rules || !window.Rules.resolveTurn){ notify('Rules engine not available.', 'error'); return; }
-  const result = window.Rules.resolveTurn(currentRulesState(), actions, { seed });
+  const result = window.Rules.resolveTurn(currentRulesState(), actions, { seed, narrative });
 
   // Run Cleanup immediately after resolution for this prototype
   const cleanupResult = window.Rules.resolveCleanup(result.newState, { seed: `${seed}:cleanup` });
@@ -831,8 +888,9 @@ function resolveSubmittedActions(families){
   if(gameState.ui.selected) updatePanel(gameState.ui.selected);
   // advance round and reset phase
   window.game.round += 1; window.game.phaseIndex = 0; q('round-num').textContent = window.game.round; q('phase-name').textContent = window.game.phases[window.game.phaseIndex];
-  // clear pending actions and submissions for the new round
+  // clear pending actions, spins, and submissions for the new round
   gameState.runtime.pendingActions = {};
+  gameState.runtime.pendingSpins = {};
   gameState.runtime.submissions = {};
   // re-render players UI so every family gets fresh controls
   renderPlayersList();

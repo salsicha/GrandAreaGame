@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Narrative Battle is now a real phase — the fourth depth lever. After the reveal, each family may make one narrative play for 4 Social Capital: Smear a rival (−3 Political Capital now, −8 effective framing on their revealed action: uglier backlash, dirtier war) or Whitewash anyone including yourself (+2 Social Capital, +8 effective framing: sanitized coverage). Plays stack, are public, and effective framing clamps to 0–50. On BGA it runs as a proper multiactive phase between reveal and resolution (smear/whitewash the selected territory, or pass); the browser prototype collects spins alongside submissions. Implemented in both engines (16-scenario cross-engine parity), the frontend turn manager, and the BGA state machine, server, and client; documented in RULES.md ("Narrative Battle").
 - Depth pass — counterplay and planning for the secret-action phase:
   - New defensive stances: `CounterIntel` (4 Black Budget; foils coups and covert influence against you for the round, exposing the attacker for 8 Social Capital and granting +5 Political Capital per foiled op) and `Fortify` (6 wealth; invasions are blunted — damage halved, no defiance bump, no invader rally). Stances register before any attack resolves regardless of turn order, are one-round only, and are wasted if nobody attacks — bluffing is the point.
   - Failed coups now rally the target around the flag (+5 Political Capital, +4 fear), making coups a real gamble.

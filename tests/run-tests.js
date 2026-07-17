@@ -1562,6 +1562,53 @@ test('a failed coup rallies the target', () => {
   assert.ok(result.logs.some(line => line.includes('rallies around the flag')));
 });
 
+test('narrative smears and whitewashes adjust framing and capital', () => {
+  const Rules = loadRules();
+  const state = {
+    Raider: territory({ family: 'RaiderFam', wealth: 100, armies: 2, socialCapital: 50, politicalCapital: 50 }),
+    Victim: territory({ family: 'VictimFam', type: 'Regional', clientOf: null, wealth: 80, happiness: 100 }),
+    Critic: territory({ family: 'CriticFam', socialCapital: 40, politicalCapital: 50 })
+  };
+
+  // Raider invades with framing 10; Critic smears the invasion coverage.
+  const smeared = Rules.resolveTurn(state, [
+    { family: 'Raider', action: 'Invade', target: 'Victim', framing: 10 }
+  ], { narrative: [{ family: 'Critic', stance: 'smear', target: 'Raider' }] });
+  // effective framing 10 - 8 = 2 -> happiness loss 23 instead of 15
+  assert.equal(smeared.newState.Victim.happiness, 77);
+  assert.equal(smeared.newState.Critic.socialCapital, 36);
+  assert.equal(smeared.newState.Raider.politicalCapital, 50 - 3 + 5);
+
+  // Whitewash instead: effective framing 10 + 8 = 18 -> happiness loss 8 (floor)
+  const washed = Rules.resolveTurn(state, [
+    { family: 'Raider', action: 'Invade', target: 'Victim', framing: 10 }
+  ], { narrative: [{ family: 'Critic', stance: 'whitewash', target: 'Raider' }] });
+  assert.equal(washed.newState.Victim.happiness, 92);
+  assert.equal(washed.newState.Raider.socialCapital, 50 - 10 - Math.max(0, 15 - Math.floor(18 / 2)) + 2);
+});
+
+test('narrative plays are validated and limited to one per family', () => {
+  const Rules = loadRules();
+  const state = {
+    Loud: territory({ family: 'LoudFam', socialCapital: 6, politicalCapital: 50 }),
+    Broke: territory({ family: 'BrokeFam', socialCapital: 3, politicalCapital: 50 }),
+    Mark: territory({ family: 'MarkFam', socialCapital: 50, politicalCapital: 50 })
+  };
+
+  const result = Rules.resolveTurn(state, [], { narrative: [
+    { family: 'Loud', stance: 'smear', target: 'Mark' },
+    { family: 'Loud', stance: 'smear', target: 'Broke' },
+    { family: 'Broke', stance: 'smear', target: 'Mark' },
+    { family: 'Mark', stance: 'smear', target: 'Mark' }
+  ] });
+  assert.equal(result.newState.Loud.socialCapital, 2); // paid once
+  assert.equal(result.newState.Mark.politicalCapital, 47); // smeared once, not twice
+  assert.equal(result.newState.Broke.politicalCapital, 50); // Loud's second play ignored
+  assert.ok(result.logs.some(line => line.includes('already made a narrative play')));
+  assert.ok(result.logs.some(line => line.includes('failed a narrative play (insufficient Social Capital)')));
+  assert.ok(result.logs.some(line => line.includes('failed Smear (cannot smear yourself)')));
+});
+
 test('BGA module matches the Studio project layout', () => {
   const required = [
     'bga/dbmodel.sql',
