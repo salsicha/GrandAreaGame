@@ -27,7 +27,7 @@ if (!function_exists('grandarea_objectives')) {
     function grandarea_objectives()
     {
         return array(
-            'headWealthWin' => 360,
+            'headWealthWin' => 400,
             'regionalWealthWin' => 320,
             'regionalPoliticalWin' => 130,
             'clientHappinessWin' => 120,
@@ -36,6 +36,52 @@ if (!function_exists('grandarea_objectives')) {
             'headRunawayWealth' => 300
         );
     }
+}
+
+if (!function_exists('grandarea_recovery')) {
+    /**
+     * Cleanup-phase recovery tuning. Must stay in sync with RECOVERY in
+     * frontend/rules.js (the reference engine).
+     */
+    function grandarea_recovery()
+    {
+        return array(
+            'productionBase' => 3,
+            'productionDevelopmentDivisor' => 20,
+            'stashTrickle' => 2,
+            'stashTrickleCeiling' => 25,
+            'stashTrickleMinWealth' => 10,
+            'capitalRegen' => 2,
+            'capitalRegenHappinessFloor' => 60,
+            'capitalRegenCap' => 150,
+            'happinessRecovery' => 4,
+            'happinessRecoveryCeiling' => 70
+        );
+    }
+}
+
+if (!function_exists('grandarea_defiance_pressure')) {
+    /**
+     * Unanswered-defiance penalties. Must stay in sync with
+     * DEFIANCE_PRESSURE in frontend/rules.js (the reference engine).
+     */
+    function grandarea_defiance_pressure()
+    {
+        return array(
+            'socialPerClient' => 3,
+            'politicalPerClient' => 3,
+            'socialCapPerResolution' => 9,
+            'politicalCapPerResolution' => 9
+        );
+    }
+}
+
+if (!defined('GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR')) {
+    define('GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR', 50);
+}
+
+if (!defined('GRANDAREA_HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE')) {
+    define('GRANDAREA_HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE', 2);
 }
 
 if (!function_exists('grandarea_allowed_actions')) {

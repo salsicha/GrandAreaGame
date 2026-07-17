@@ -25,8 +25,36 @@
   "comebackPressure": {
     "headWealthThreshold": 300,
     "clientDefianceGain": 1,
+    "emboldenedClients": "unhappiestOnly",
     "regionalPoliticalGain": 4,
     "headSocialCapitalPenalty": 6
+  },
+  "cleanupRecovery": {
+    "productionBase": 3,
+    "productionDevelopmentDivisor": 20,
+    "stashTrickle": 2,
+    "stashTrickleCeiling": 25,
+    "stashTrickleMinWealth": 10,
+    "capitalRegen": 2,
+    "capitalRegenHappinessFloor": 60,
+    "capitalRegenCap": 150,
+    "happinessRecovery": 4,
+    "happinessRecoveryCeiling": 70
+  },
+  "defiancePressure": {
+    "socialPerClient": 3,
+    "politicalPerClient": 3,
+    "socialCapPerResolution": 9,
+    "politicalCapPerResolution": 9
+  },
+  "uprising": {
+    "happinessSafeFloor": 50,
+    "chance": 0.5
+  },
+  "headDefianceMajority": {
+    "scope": "ownClients",
+    "minimumDefiantClients": 2,
+    "cleanupsToLose": 2
   },
   "clientVictoryPath": {
     "requiresDefiance": true,

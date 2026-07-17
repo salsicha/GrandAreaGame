@@ -7,6 +7,15 @@ $game_options = array(
             1 => array('name' => totranslate('Prototype five-region setup'), 'tmdisplay' => totranslate('Prototype setup'))
         ),
         'default' => 1
+    ),
+    101 => array(
+        'name' => totranslate('Game length'),
+        'values' => array(
+            1 => array('name' => totranslate('Standard (20 rounds)'), 'tmdisplay' => totranslate('Standard')),
+            2 => array('name' => totranslate('Short (12 rounds)'), 'tmdisplay' => totranslate('Short')),
+            3 => array('name' => totranslate('Long (30 rounds)'), 'tmdisplay' => totranslate('Long'))
+        ),
+        'default' => 1
     )
 );
 

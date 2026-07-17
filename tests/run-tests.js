@@ -110,8 +110,10 @@ test('frontend JavaScript parses', () => {
   const jsFiles = [
     'frontend/app.js',
     'frontend/rules.js',
-    'bga/client/grandareagame.js',
+    'bga/grandareagame.js',
     'tools/simulate-balance.js',
+    'tools/generate-bga-material.js',
+    'tools/generate-bga-board.js',
     'tests/run-tests.js',
     ...listFilesRecursive('playtest', file => file.endsWith('.js'))
   ];
@@ -553,7 +555,7 @@ test('resource pressure reduces wealth development and happiness', () => {
 
   const result = Rules.resolveResourcePressure(state);
   assert.equal(result.newState.Alpha.wealth, 95);
-  assert.equal(result.newState.Alpha.development, 48);
+  assert.equal(result.newState.Alpha.development, 49);
   assert.equal(result.newState.Alpha.happiness, 48);
 });
 
@@ -565,7 +567,7 @@ test('missing oil adds army upkeep pressure', () => {
 
   const result = Rules.resolveResourcePressure(state);
   assert.equal(result.newState.Alpha.wealth, 92);
-  assert.equal(result.newState.Alpha.development, 48);
+  assert.equal(result.newState.Alpha.development, 49);
   assert.equal(result.newState.Alpha.happiness, 48);
 });
 
@@ -671,7 +673,7 @@ test('debt shakedown creates debt and backlash', () => {
   assert.equal(result.newState.Alpha.politicalCapital, 42);
   assert.equal(result.newState.Beta.wealth, 60);
   assert.equal(result.newState.Beta.debt, 25);
-  assert.equal(result.newState.Beta.happiness, 88);
+  assert.equal(result.newState.Beta.happiness, 92);
   assert.equal(result.newState.Beta.governanceChangeSentiment, 7);
   assert.equal(result.newState.Beta.defiance, 1);
 });
@@ -788,6 +790,12 @@ test('balance simulation harness runs deterministic sample games', () => {
   assert.equal(typeof result.roundsPlayed, 'number');
   assert.ok(result.roundsPlayed >= 1);
   assert.ok(Array.isArray(result.winners));
+  assert.ok(Array.isArray(result.deaths));
+  for (const death of result.deaths) {
+    assert.equal(typeof death.seat, 'string');
+    assert.equal(typeof death.round, 'number');
+    assert.equal(typeof death.cause, 'string');
+  }
   assert.ok(Array.isArray(result.crisesDrawn));
   assert.ok(result.crisesDrawn.length >= 1, 'expected at least one crisis draw');
   for (const role of ['Head', 'Regional', 'Client']) {
@@ -925,8 +933,23 @@ test('unanswered defiance penalizes the overlord', () => {
   };
 
   const result = Rules.resolveTurn(state, []);
-  assert.equal(result.newState.USA.socialCapital, 45);
-  assert.equal(result.newState.USA.politicalCapital, 45);
+  assert.equal(result.newState.USA.socialCapital, 47);
+  assert.equal(result.newState.USA.politicalCapital, 47);
+});
+
+test('unanswered defiance pressure is capped per overlord', () => {
+  const Rules = loadRules();
+  const state = {
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, socialCapital: 50, politicalCapital: 50 }),
+    C1: territory({ family: 'C1 Family', type: 'Client', clientOf: 'USA', defiance: 1 }),
+    C2: territory({ family: 'C2 Family', type: 'Client', clientOf: 'USA', defiance: 2 }),
+    C3: territory({ family: 'C3 Family', type: 'Client', clientOf: 'USA', defiance: 1 }),
+    C4: territory({ family: 'C4 Family', type: 'Client', clientOf: 'USA', defiance: 3 })
+  };
+
+  const result = Rules.applyUnansweredDefiancePressure(state);
+  assert.equal(result.newState.USA.socialCapital, 41);
+  assert.equal(result.newState.USA.politicalCapital, 41);
 });
 
 test('cleanup collapses families with exhausted capital', () => {
@@ -951,6 +974,63 @@ test('cleanup uprising can remove a family when happiness is below stash', () =>
   assert.equal(result.newState.Alpha.family, 'Anarchy');
   assert.equal(result.newState.Alpha.wealth, 0);
   assert.equal(result.newState.Alpha.invaded, false);
+});
+
+test('uprisings are only risked below the happiness safe floor', () => {
+  const Rules = loadRules([0.1, 0.1]);
+  const state = {
+    Risky: territory({ family: 'Risky Family', happiness: 45, stash: 60 }),
+    Safe: territory({ family: 'Safe Family', happiness: 55, stash: 60 })
+  };
+
+  const result = Rules.resolveCleanup(state);
+  assert.equal(result.newState.Risky.family, 'Anarchy');
+  assert.equal(result.newState.Safe.family, 'Safe Family');
+});
+
+test('cleanup recovery regenerates wealth stash capitals and happiness', () => {
+  const Rules = loadRules();
+  const state = {
+    Alpha: territory({ wealth: 40, stash: 10, development: 45, happiness: 80, socialCapital: 50, politicalCapital: 149 }),
+    Beta: territory({ wealth: 5, stash: 30, development: 0, happiness: 40, socialCapital: 150, politicalCapital: 160 })
+  };
+
+  const result = Rules.applyCleanupRecovery(state);
+  // Production 3 + floor(45 / 20) = 5, then 2 wealth trickles into stash.
+  assert.equal(result.newState.Alpha.wealth, 43);
+  assert.equal(result.newState.Alpha.stash, 12);
+  // Civic regeneration: +2 each while below the 150 cap.
+  assert.equal(result.newState.Alpha.socialCapital, 52);
+  assert.equal(result.newState.Alpha.politicalCapital, 150);
+  assert.equal(result.newState.Alpha.happiness, 80);
+  // Beta: base production only, no trickle at stash 30, capitals at/over cap
+  // untouched, unrest recovery below the 70 happiness ceiling.
+  assert.equal(result.newState.Beta.wealth, 8);
+  assert.equal(result.newState.Beta.stash, 30);
+  assert.equal(result.newState.Beta.socialCapital, 150);
+  assert.equal(result.newState.Beta.politicalCapital, 160);
+  assert.equal(result.newState.Beta.happiness, 44);
+});
+
+test('cleanup recovery cannot rescue a capital already at zero', () => {
+  const Rules = loadRules();
+  const state = {
+    Alpha: territory({ socialCapital: 0, happiness: 100, stash: 20 })
+  };
+
+  const result = Rules.resolveCleanup(state);
+  assert.equal(result.newState.Alpha.family, 'Collapsed');
+});
+
+test('a family that already won cannot collapse in the same cleanup', () => {
+  const Rules = loadRules();
+  const state = {
+    Alpha: territory({ family: 'AlphaFamily', outcome: 'Won', stash: 0, socialCapital: 0 })
+  };
+
+  const result = Rules.resolveCleanup(state);
+  assert.equal(result.newState.Alpha.family, 'AlphaFamily');
+  assert.equal(result.newState.Alpha.outcome, 'Won');
 });
 
 test('sentiment tracks update from defiance happiness stash and fear', () => {
@@ -990,14 +1070,18 @@ test('head runaway wealth creates comeback pressure', () => {
   const Rules = loadRules();
   const state = {
     NorthAmerica: territory({ family: 'USA', type: 'Head', clientOf: null, wealth: 310, socialCapital: 80 }),
-    LatinAmerica: territory({ family: 'Latin Client Coalition', type: 'Client', clientOf: 'USA', defiance: 0, independenceSentiment: 40 }),
+    LatinAmerica: territory({ family: 'Latin Client Coalition', type: 'Client', clientOf: 'USA', happiness: 70, defiance: 0, independenceSentiment: 40 }),
+    Oceania: territory({ family: 'Pacific Client Bloc', type: 'Client', clientOf: 'USA', happiness: 95, defiance: 0, independenceSentiment: 40 }),
     EastAsia: territory({ family: 'China', type: 'Regional', clientOf: null, politicalCapital: 90, rivalryPressure: 0 })
   };
 
   const result = Rules.applyComebackPressure(state);
   assert.equal(result.newState.NorthAmerica.socialCapital, 74);
+  // Only the unhappiest client of the runaway head is emboldened.
   assert.equal(result.newState.LatinAmerica.defiance, 1);
   assert.equal(result.newState.LatinAmerica.independenceSentiment, 45);
+  assert.equal(result.newState.Oceania.defiance, 0);
+  assert.equal(result.newState.Oceania.independenceSentiment, 40);
   assert.equal(result.newState.EastAsia.politicalCapital, 94);
   assert.equal(result.newState.EastAsia.rivalryPressure, 2);
 });
@@ -1006,10 +1090,23 @@ test('asymmetric objectives award role-specific wins', () => {
   const Rules = loadRules();
 
   const head = Rules.evaluateObjectives({
-    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 360 }),
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 400 }),
     Clientia: territory({ family: 'Client Family', type: 'Client', clientOf: 'Head Family', defiance: 0 })
   });
   assert.equal(head.newState.Headland.outcome, 'Won');
+
+  const headWithDefiantRival = Rules.evaluateObjectives({
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 400 }),
+    Clientia: territory({ family: 'Client Family', type: 'Client', clientOf: 'Head Family', defiance: 0 }),
+    Rivalia: territory({ family: 'Rival Client', type: 'Client', clientOf: 'Other Family', defiance: 2 })
+  });
+  assert.equal(headWithDefiantRival.newState.Headland.outcome, 'Won');
+
+  const headWithOwnDefiance = Rules.evaluateObjectives({
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 400 }),
+    Clientia: territory({ family: 'Client Family', type: 'Client', clientOf: 'Head Family', defiance: 1 })
+  });
+  assert.notEqual(headWithOwnDefiance.newState.Headland.outcome, 'Won');
 
   const regional = Rules.evaluateObjectives({
     Regionalia: territory({ family: 'Regional Family', type: 'Regional', clientOf: null, wealth: 320, politicalCapital: 130 })
@@ -1031,7 +1128,7 @@ test('asymmetric objectives apply role-specific losses', () => {
   const Rules = loadRules();
 
   const head = Rules.evaluateObjectives({
-    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null }),
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, defianceMajorityRounds: 2 }),
     ClientA: territory({ family: 'Client A', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
     ClientB: territory({ family: 'Client B', type: 'Client', clientOf: 'Head Family', defiance: 1 })
   });
@@ -1080,10 +1177,10 @@ test('eliminated actors cannot act', () => {
   assert.ok(result.logs.some(line => line.includes('eliminated and cannot act')));
 });
 
-test('head loses only to a strict majority of defiant clients', () => {
+test('head loses only to a strict majority of its own defiant clients', () => {
   const Rules = loadRules();
   const base = {
-    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null }),
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, defianceMajorityRounds: 2 }),
     C1: territory({ family: 'C1 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
     C2: territory({ family: 'C2 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
     C3: territory({ family: 'C3 Family', type: 'Client', clientOf: 'Head Family', defiance: 0 }),
@@ -1098,6 +1195,47 @@ test('head loses only to a strict majority of defiant clients', () => {
     C3: territory({ family: 'C3 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 })
   });
   assert.equal(majority.newState.Headland.outcome, 'Lost');
+
+  // Rival hierarchies' defiant clients no longer count against the head.
+  const rivalDefiance = Rules.evaluateObjectives({
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, defianceMajorityRounds: 2 }),
+    C1: territory({ family: 'C1 Family', type: 'Client', clientOf: 'Head Family', defiance: 0 }),
+    R1: territory({ family: 'R1 Family', type: 'Client', clientOf: 'Other Family', defiance: 3 }),
+    R2: territory({ family: 'R2 Family', type: 'Client', clientOf: 'Other Family', defiance: 3 })
+  });
+  assert.notEqual(rivalDefiance.newState.Headland.outcome, 'Lost');
+
+  // A single defiant client can never topple the head on its own.
+  const lonely = Rules.evaluateObjectives({
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, defianceMajorityRounds: 2 }),
+    C1: territory({ family: 'C1 Family', type: 'Client', clientOf: 'Head Family', defiance: 5 })
+  });
+  assert.notEqual(lonely.newState.Headland.outcome, 'Lost');
+});
+
+test('defiant-client majority must persist through two cleanups to topple the head', () => {
+  const Rules = loadRules();
+  const state = {
+    Headland: territory({ family: 'Head Family', type: 'Head', clientOf: null, wealth: 100, happiness: 100, stash: 20 }),
+    C1: territory({ family: 'C1 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 }),
+    C2: territory({ family: 'C2 Family', type: 'Client', clientOf: 'Head Family', defiance: 1 })
+  };
+
+  const first = Rules.resolveCleanup(state);
+  assert.equal(first.newState.Headland.defianceMajorityRounds, 1);
+  assert.notEqual(first.newState.Headland.outcome, 'Lost');
+
+  const second = Rules.resolveCleanup(first.newState);
+  assert.equal(second.newState.Headland.defianceMajorityRounds, 2);
+  assert.equal(second.newState.Headland.outcome, 'Lost');
+
+  // Breaking the majority in time resets the counter and spares the head.
+  const answered = Rules.resolveCleanup({
+    ...first.newState,
+    C1: { ...first.newState.C1, defiance: 0 }
+  });
+  assert.equal(answered.newState.Headland.defianceMajorityRounds, 0);
+  assert.notEqual(answered.newState.Headland.outcome, 'Lost');
 });
 
 test('an eliminated defiant client stops bleeding its overlord', () => {
@@ -1314,7 +1452,7 @@ test('lightweight lint and format checks pass for source files', () => {
     assert.equal(opens, closes, `${file} has unbalanced CSS braces`);
   }
 
-  const sql = readText('bga', 'grandareagame.sql');
+  const sql = readText('bga', 'dbmodel.sql');
   assert.match(sql, /CREATE TABLE IF NOT EXISTS territories/);
   assert.doesNotMatch(sql, /DROP TABLE/i);
 
@@ -1324,6 +1462,107 @@ test('lightweight lint and format checks pass for source files', () => {
   assert.match(bgaAction, /class action_grandareagame extends APP_GameAction/);
   assert.match(bgaGame, /GrandAreaRules::resolveTurn/);
   assert.match(bgaGame, /setupNewGame/);
+});
+
+test('balance.json documentation blocks match the engine constants', () => {
+  const Rules = loadRules();
+  const balance = readJson('frontend', 'data', 'balance.json');
+  // JSON round-trip: vm-realm objects have foreign prototypes that fail deepStrictEqual.
+  assert.deepEqual(balance.cleanupRecovery, JSON.parse(JSON.stringify(Rules.RECOVERY)),
+    'balance.json cleanupRecovery drifted from RECOVERY in rules.js');
+  assert.deepEqual(balance.defiancePressure, JSON.parse(JSON.stringify(Rules.DEFIANCE_PRESSURE)),
+    'balance.json defiancePressure drifted from DEFIANCE_PRESSURE in rules.js');
+  const source = readText('frontend', 'rules.js');
+  assert.ok(source.includes(`UPRISING_HAPPINESS_SAFE_FLOOR = ${balance.uprising.happinessSafeFloor};`),
+    'balance.json uprising.happinessSafeFloor drifted from rules.js');
+  assert.ok(source.includes(`HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE = ${balance.headDefianceMajority.cleanupsToLose};`),
+    'balance.json headDefianceMajority.cleanupsToLose drifted from rules.js');
+});
+
+test('eliminated players cannot play cards', () => {
+  const Rules = loadRules();
+  const state = {
+    Ghost: territory({ family: 'GhostFam', outcome: 'Lost', blackBudget: 20 }),
+    Victim: territory({ family: 'VictimFam', happiness: 100 })
+  };
+  const result = Rules.resolveCard(state, 'rotten_apple', 'Ghost', 'Victim');
+  assert.equal(result.newState.Victim.happiness, 100);
+  assert.ok(result.logs.some(line => line.includes('eliminated and cannot play cards')));
+});
+
+test('a successful coup resets the defiance-majority counter', () => {
+  const Rules = loadRules([0.1]);
+  const state = {
+    Alpha: territory({ family: 'AlphaFamily', politicalCapital: 100, socialCapital: 80 }),
+    Beta: territory({ family: 'BetaFamily', type: 'Head', clientOf: null, politicalCapital: 50, happiness: 90, defianceMajorityRounds: 1 })
+  };
+  const result = Rules.resolveTurn(state, [{ family: 'Alpha', action: 'Coup', target: 'Beta' }]);
+  assert.equal(result.newState.Beta.family, 'AlphaFamily');
+  assert.equal(result.newState.Beta.defianceMajorityRounds, 0);
+});
+
+test('BGA module matches the Studio project layout', () => {
+  const required = [
+    'bga/dbmodel.sql',
+    'bga/gameinfos.inc.php',
+    'bga/gameoptions.inc.php',
+    'bga/material.inc.php',
+    'bga/states.inc.php',
+    'bga/stats.inc.php',
+    'bga/grandareagame.game.php',
+    'bga/grandareagame.action.php',
+    'bga/grandareagame.view.php',
+    'bga/grandareagame.js',
+    'bga/grandareagame.css',
+    'bga/grandareagame_grandareagame.tpl',
+    'bga/img/game_box.png',
+    'bga/img/game_icon.png',
+    'bga/img/game_banner.png'
+  ];
+  for (const file of required) {
+    assert.ok(fs.existsSync(fromRoot(file)), `missing BGA Studio file ${file}`);
+  }
+  assert.ok(!fs.existsSync(fromRoot('bga', 'client')), 'bga/client should not exist in the Studio layout');
+  const game = readText('bga', 'grandareagame.game.php');
+  assert.match(game, /public function zombieTurn/);
+  assert.match(game, /public function upgradeTableDb/);
+  assert.match(game, /protected function getAllDatas/);
+  assert.match(game, /public function getGameProgression/);
+});
+
+test('BGA module is self-contained (no reads outside the game folder)', () => {
+  const phpFiles = listFilesRecursive('bga', file => file.endsWith('.php'));
+  for (const file of phpFiles) {
+    const text = readText(file);
+    assert.doesNotMatch(text, /file_get_contents/, `${file} reads external files at runtime`);
+    assert.doesNotMatch(text, /dirname\(__DIR__\)\s*\.\s*'\/frontend/, `${file} references the frontend folder`);
+  }
+});
+
+test('BGA embedded material matches the frontend data fixtures', () => {
+  const crypto = require('node:crypto');
+  const sources = ['territories.json', 'crisis.json', 'playercards.json', 'setups.json', 'balance.json'];
+  const joined = sources.map(name => readText('frontend', 'data', name)).join('\n');
+  const expected = crypto.createHash('sha256').update(joined).digest('hex');
+  const material = readText('bga', 'material.inc.php');
+  const match = material.match(/source-checksum: ([a-f0-9]{64})/);
+  assert.ok(match, 'material.inc.php is missing its source-checksum header');
+  assert.equal(match[1], expected,
+    'bga/material.inc.php is stale — regenerate with: node tools/generate-bga-material.js');
+  for (const marker of ['territoryMaterial', 'crisisMaterial', 'playerCardMaterial', 'setupMaterial', 'balanceMaterial']) {
+    assert.ok(material.includes(`$this->${marker}`), `material.inc.php missing ${marker}`);
+  }
+});
+
+test('BGA board template embeds the world map safely', () => {
+  const tpl = readText('bga', 'grandareagame_grandareagame.tpl');
+  const territories = readJson('frontend', 'data', 'territories.json');
+  assert.match(tpl, /\{OVERALL_GAME_HEADER\}/);
+  assert.match(tpl, /\{OVERALL_GAME_FOOTER\}/);
+  for (const key of Object.keys(territories)) {
+    assert.ok(tpl.includes(`data-country="${key}"`), `template missing region ${key}`);
+  }
+  assert.doesNotMatch(tpl, /<style>/, 'inline <style> blocks break the BGA template engine');
 });
 
 const cliArgs = process.argv.slice(2);

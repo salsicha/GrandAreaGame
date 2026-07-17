@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS territories (
   factionalDivision INT DEFAULT 0,
   fear INT DEFAULT 0,
   defiance INT DEFAULT 0,
+  defianceMajorityRounds INT DEFAULT 0,
   armies INT DEFAULT 0,
   invaded TINYINT(1) DEFAULT 0,
   protected TINYINT(1) DEFAULT 0,
@@ -42,9 +43,6 @@ CREATE TABLE IF NOT EXISTS player_state (
   player_id INT NOT NULL,
   family_name VARCHAR(64),
   hand_json TEXT NOT NULL,
-  stash INT DEFAULT 0,
-  socialCapital INT DEFAULT 0,
-  politicalCapital INT DEFAULT 0,
   PRIMARY KEY(game_id, player_id)
 );
 

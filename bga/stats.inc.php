@@ -16,7 +16,7 @@ $stats_type = array(
     'player' => array(
         'tribute_paid' => array(
             'id' => 20,
-            'name' => totranslate('Tribute paid'),
+            'name' => totranslate('Tribute collected'),
             'type' => 'int'
         ),
         'actions_resolved' => array(

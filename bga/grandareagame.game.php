@@ -15,7 +15,8 @@ class GrandAreaGame extends Table
     {
         parent::__construct();
         self::initGameStateLabels(array(
-            'round_number' => 10
+            'round_number' => 10,
+            'game_length' => 101
         ));
     }
 
@@ -24,12 +25,37 @@ class GrandAreaGame extends Table
         return 'grandareagame';
     }
 
+    /**
+     * Every BGA table runs in its own database, so a literal scope id is
+     * sufficient; no undocumented framework accessors are needed.
+     */
+    private function gameId()
+    {
+        return 0;
+    }
+
+    /**
+     * Hard round limit from the "Game length" option; guarantees the game
+     * always terminates even when no family reaches an objective.
+     */
+    private function roundLimit()
+    {
+        $option = intval(self::getGameStateValue('game_length'));
+        if ($option === 2) {
+            return 12;
+        }
+        if ($option === 3) {
+            return 30;
+        }
+        return 20;
+    }
+
     public function setupNewGame($players, $options = array())
     {
-        $gameId = intval(self::getGameId());
-        $territories = $this->loadMaterialJson('territories.json');
-        $crisis = $this->loadMaterialJson('crisis.json');
-        $cards = $this->loadMaterialJson('playercards.json');
+        $gameId = $this->gameId();
+        $territories = $this->territoryMaterial;
+        $crisis = $this->crisisMaterial;
+        $cards = $this->playerCardMaterial;
 
         // Framework player table: colors, canal, name, avatar.
         $gameinfos = self::getGameinfos();
@@ -61,11 +87,11 @@ class GrandAreaGame extends Table
         foreach ($players as $playerId => $player) {
             $family = $families[$seat % count($families)];
             $seat++;
-            $sql = "REPLACE INTO player_state (game_id, player_id, family_name, hand_json, stash, socialCapital, politicalCapital) VALUES ("
+            $sql = "REPLACE INTO player_state (game_id, player_id, family_name, hand_json) VALUES ("
                 . $gameId . ", "
                 . intval($playerId) . ", "
                 . $this->sqlString($family) . ", "
-                . $this->sqlString('[]') . ", 0, 0, 0)";
+                . $this->sqlString('[]') . ")";
             self::DbQuery($sql);
         }
 
@@ -73,6 +99,7 @@ class GrandAreaGame extends Table
         $this->persistRuntime('crisis_discard', array());
         $this->persistRuntime('current_crisis', null);
         $this->persistRuntime('player_deck', $this->buildPlayerDeck($cards, 'setup-cards:' . $gameId . ':' . $salt));
+        $this->persistRuntime('card_discard', array());
         $this->persistRuntime('revealed_payloads', array());
 
         self::setGameStateInitialValue('round_number', 1);
@@ -129,8 +156,10 @@ class GrandAreaGame extends Table
         if (isset($result['payments'])) {
             $playersByFamily = $this->playerIdsByFamily();
             foreach ($result['payments'] as $payment) {
-                if (isset($playersByFamily[$payment['from_family']])) {
-                    self::incStat($payment['amount'], 'tribute_paid', $playersByFamily[$payment['from_family']]);
+                // Credit the receiving overlord: client blocs are not player
+                // families in the shipped setups, so 'from' never matches.
+                if (isset($playersByFamily[$payment['to_family']])) {
+                    self::incStat($payment['amount'], 'tribute_paid', $playersByFamily[$payment['to_family']]);
                 }
             }
         }
@@ -141,18 +170,22 @@ class GrandAreaGame extends Table
 
     public function stActionSubmission()
     {
-        $this->gamestate->setAllPlayersMultiactive();
         self::notifyAllPlayers('actionSubmissionOpen', '', array(
             'round' => intval(self::getGameStateValue('round_number'))
         ));
+        // Activate exactly the living players in one call: activating all
+        // and skipping one-by-one could fire the transition mid-loop.
+        $this->gamestate->setPlayersMultiactive($this->livingPlayerIds(), 'next', true);
     }
 
     public function stReveal()
     {
-        $this->gamestate->setAllPlayersMultiactive();
         self::notifyAllPlayers('revealOpen', '', array(
             'round' => intval(self::getGameStateValue('round_number'))
         ));
+        // Only players holding a commitment this round have anything to
+        // reveal; a single exclusive activation avoids mid-loop transitions.
+        $this->gamestate->setPlayersMultiactive($this->committedPlayerIds(), 'next', true);
     }
 
     public function stNarrativeBattle()
@@ -186,7 +219,8 @@ class GrandAreaGame extends Table
 
         self::incStat(1, 'rounds_played');
 
-        if ($this->maybeEndGame($cleanup['newState'])) {
+        $limitReached = intval(self::getGameStateValue('round_number')) >= $this->roundLimit();
+        if ($this->maybeEndGame($cleanup['newState'], $limitReached)) {
             $this->gamestate->nextState('endGame');
             return;
         }
@@ -210,9 +244,14 @@ class GrandAreaGame extends Table
             throw new BgaUserException('Commit hash must be a lowercase SHA-256 hash');
         }
 
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $playerId = intval(self::getCurrentPlayerId());
         $round = intval(self::getGameStateValue('round_number'));
+
+        $family = $this->familyForPlayer($playerId);
+        if ($this->actorTerritoryKey($this->loadTerritoryState(), $family) === null) {
+            throw new BgaUserException('Your family has been eliminated and cannot act');
+        }
 
         // Once any reveal has happened this round the commitments are locked:
         // late re-commits could react to revealed information.
@@ -242,10 +281,10 @@ class GrandAreaGame extends Table
             throw new BgaUserException('Reveal payload is too large');
         }
 
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $playerId = intval(self::getCurrentPlayerId());
         $round = intval(self::getGameStateValue('round_number'));
-        $expected = hash('sha256', $gameId . '|' . $playerId . '|' . $payload . '|' . $nonce);
+        $expected = hash('sha256', $playerId . '|' . $payload . '|' . $nonce);
         $row = self::getObjectFromDb(
             "SELECT commit_hash, revealed FROM secret_submissions WHERE game_id = " . $gameId
             . " AND round_number = " . $round . " AND player_id = " . $playerId,
@@ -281,7 +320,7 @@ class GrandAreaGame extends Table
     {
         self::checkAction('playCard');
 
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $playerId = intval(self::getCurrentPlayerId());
         $hand = $this->handForPlayer($playerId);
         $position = array_search($cardId, $hand, true);
@@ -322,6 +361,11 @@ class GrandAreaGame extends Table
         array_splice($hand, $position, 1);
         $this->saveHandForPlayer($playerId, $hand);
 
+        // Played cards cycle to a discard so the deck can reshuffle.
+        $discard = $this->loadRuntime('card_discard', array());
+        $discard[] = $cardId;
+        $this->persistRuntime('card_discard', $discard);
+
         self::incStat(1, 'cards_played', $playerId);
 
         self::notifyAllPlayers('cardPlayed', '', array(
@@ -343,12 +387,73 @@ class GrandAreaGame extends Table
     }
 
     // ------------------------------------------------------------------
+    // Framework obligations
+    // ------------------------------------------------------------------
+
+    /**
+     * Zombie handling: an absent player simply stops participating. In
+     * multiactive phases they are marked done (their family Passes when
+     * nothing was revealed); game-type states need no zombie action.
+     */
+    public function zombieTurn($state, $active_player)
+    {
+        if ($state['type'] === 'multipleactiveplayer') {
+            $this->gamestate->setPlayerNonMultiactive(intval($active_player), 'next');
+            return;
+        }
+        throw new feException('Zombie mode not supported at this game state: ' . $state['name']);
+    }
+
+    /**
+     * Database migration hook for tables created before a code update.
+     * No released tables exist yet, so there is nothing to migrate.
+     */
+    public function upgradeTableDb($from_version)
+    {
+    }
+
+    // ------------------------------------------------------------------
+    // Multiactive phase skips
+    // ------------------------------------------------------------------
+
+    /** Player ids whose family still controls a surviving territory. */
+    private function livingPlayerIds()
+    {
+        $state = $this->loadTerritoryState();
+        $rows = self::getObjectListFromDB(
+            "SELECT player_id, family_name FROM player_state WHERE game_id = " . $this->gameId()
+        );
+        $ids = array();
+        foreach ($rows as $row) {
+            if ($this->actorTerritoryKey($state, $row['family_name']) !== null) {
+                $ids[] = intval($row['player_id']);
+            }
+        }
+        return $ids;
+    }
+
+    /** Player ids holding an unrevealed or revealed commitment this round. */
+    private function committedPlayerIds()
+    {
+        $round = intval(self::getGameStateValue('round_number'));
+        $rows = self::getObjectListFromDB(
+            "SELECT player_id FROM secret_submissions WHERE game_id = " . $this->gameId()
+            . " AND round_number = " . $round
+        );
+        $ids = array();
+        foreach ($rows as $row) {
+            $ids[] = intval($row['player_id']);
+        }
+        return $ids;
+    }
+
+    // ------------------------------------------------------------------
     // Resolution
     // ------------------------------------------------------------------
 
     public function resolveRevealedRound()
     {
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $round = intval(self::getGameStateValue('round_number'));
         $rows = self::getObjectListFromDB(
             "SELECT player_id, reveal_payload FROM secret_submissions WHERE game_id = " . $gameId
@@ -401,13 +506,15 @@ class GrandAreaGame extends Table
     // ------------------------------------------------------------------
 
     /**
-     * Ends the game when any territory has a Won outcome or when at most one
-     * player still controls a surviving territory. Winners score 1;
-     * player_score_aux ranks families by total wealth as the tiebreak.
+     * Ends the game when any territory has a Won outcome, when at most one
+     * player still controls a surviving territory, or when $force is set
+     * (round limit reached). Scores: objective winners 1000 + wealth,
+     * other survivors their family wealth, eliminated players 0;
+     * player_score_aux carries wealth as the tiebreak.
      */
-    private function maybeEndGame($state)
+    private function maybeEndGame($state, $force = false)
     {
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $anyWon = false;
         foreach ($state as $data) {
             if (isset($data['outcome']) && $data['outcome'] === 'Won') {
@@ -450,16 +557,16 @@ class GrandAreaGame extends Table
             );
         }
 
-        if (!$anyWon && $survivorCount > 1) {
+        if (!$anyWon && $survivorCount > 1 && !$force) {
             return false;
         }
 
         foreach ($summary as $entry) {
             $score = 0;
             if ($entry['won']) {
-                $score = 1;
-            } elseif (!$anyWon && $entry['surviving'] && $survivorCount === 1) {
-                $score = 1;
+                $score = 1000 + intval($entry['wealth']);
+            } elseif ($entry['surviving']) {
+                $score = intval($entry['wealth']);
             }
             self::DbQuery("UPDATE player SET player_score = " . intval($score)
                 . ", player_score_aux = " . intval($entry['wealth'])
@@ -476,7 +583,7 @@ class GrandAreaGame extends Table
 
     protected function getAllDatas()
     {
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $currentPlayerId = intval(self::getCurrentPlayerId());
 
         $result = array();
@@ -484,8 +591,14 @@ class GrandAreaGame extends Table
             "SELECT player_id id, player_score score, player_name name, player_color color FROM player"
         );
         $result['round'] = intval(self::getGameStateValue('round_number'));
+        $result['round_limit'] = $this->roundLimit();
         $result['territories'] = $this->loadTerritoryState();
         $result['current_crisis'] = $this->loadRuntime('current_crisis', null);
+        $crisisId = $result['current_crisis'];
+        $result['current_crisis_card'] = $crisisId !== null ? $this->crisisCardById($crisisId) : null;
+        // Public material the client needs for rendering (no hidden info).
+        $result['card_defs'] = $this->playerCardMaterial;
+        $result['allowed_actions'] = $this->allowedActions;
 
         // Hidden information: opponents only ever receive hand counts.
         $result['families'] = array();
@@ -512,9 +625,8 @@ class GrandAreaGame extends Table
 
     public function getGameProgression()
     {
-        // Rounds toward a nominal 12-round arc; clamped by the framework contract.
         $round = intval(self::getGameStateValue('round_number'));
-        return max(0, min(100, intval(($round - 1) * 100 / 12)));
+        return max(0, min(100, intval(($round - 1) * 100 / $this->roundLimit())));
     }
 
     // ------------------------------------------------------------------
@@ -546,17 +658,21 @@ class GrandAreaGame extends Table
 
     /**
      * Acting territory for a family: direct key match first, then the first
-     * territory (sorted keys) controlled by the family.
+     * territory (sorted keys) controlled by the family. Eliminated
+     * territories (collapsed, anarchy, or marked Lost) never qualify, so an
+     * eliminated player cannot act and a multi-territory family falls back
+     * to a surviving holding.
      */
     private function actorTerritoryKey($state, $family)
     {
-        if (isset($state[$family])) {
+        if (isset($state[$family]) && !GrandAreaRules::isEliminated($state[$family])) {
             return $family;
         }
         $keys = array_keys($state);
         sort($keys, SORT_STRING);
         foreach ($keys as $key) {
-            if (isset($state[$key]['family']) && $state[$key]['family'] === $family) {
+            if (isset($state[$key]['family']) && $state[$key]['family'] === $family
+                && !GrandAreaRules::isEliminated($state[$key])) {
                 return $key;
             }
         }
@@ -565,7 +681,7 @@ class GrandAreaGame extends Table
 
     private function familiesForPlayerCount($territories, $playerCount)
     {
-        $setups = $this->loadMaterialJson('setups.json');
+        $setups = $this->setupMaterial;
         $key = strval($playerCount);
         if (isset($setups[$key]) && isset($setups[$key]['families']) && count($setups[$key]['families']) > 0) {
             return array_values($setups[$key]['families']);
@@ -583,7 +699,7 @@ class GrandAreaGame extends Table
     private function playerIdsByFamily()
     {
         $rows = self::getObjectListFromDB(
-            "SELECT player_id, family_name FROM player_state WHERE game_id = " . intval(self::getGameId())
+            "SELECT player_id, family_name FROM player_state WHERE game_id = " . $this->gameId()
         );
         $map = array();
         foreach ($rows as $row) {
@@ -595,7 +711,7 @@ class GrandAreaGame extends Table
     private function familyForPlayer($playerId)
     {
         $row = self::getObjectFromDb(
-            "SELECT family_name FROM player_state WHERE game_id = " . intval(self::getGameId()) . " AND player_id = " . intval($playerId),
+            "SELECT family_name FROM player_state WHERE game_id = " . $this->gameId() . " AND player_id = " . intval($playerId),
             true
         );
         if (!$row) {
@@ -613,8 +729,9 @@ class GrandAreaGame extends Table
         if ($cardsPerPlayer <= 0) {
             return;
         }
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $deck = $this->loadRuntime('player_deck', array());
+        $discard = $this->loadRuntime('card_discard', array());
         $maxHand = $this->balanceValue('maxCardsInHand', 5);
 
         $rows = self::getObjectListFromDB(
@@ -628,6 +745,11 @@ class GrandAreaGame extends Table
             }
             $dealt = false;
             for ($i = 0; $i < $cardsPerPlayer; $i++) {
+                if (count($deck) === 0 && count($discard) > 0) {
+                    // Reshuffle played cards back into the deck.
+                    $deck = $this->shuffleIdsFromIds($discard, $this->seedFor('card-reshuffle'));
+                    $discard = array();
+                }
                 if (count($hand) >= $maxHand || count($deck) === 0) {
                     break;
                 }
@@ -640,13 +762,14 @@ class GrandAreaGame extends Table
             }
         }
         $this->persistRuntime('player_deck', $deck);
+        $this->persistRuntime('card_discard', $discard);
         $this->notifyHandCounts();
     }
 
     private function handForPlayer($playerId)
     {
         $row = self::getObjectFromDb(
-            "SELECT hand_json FROM player_state WHERE game_id = " . intval(self::getGameId()) . " AND player_id = " . intval($playerId),
+            "SELECT hand_json FROM player_state WHERE game_id = " . $this->gameId() . " AND player_id = " . intval($playerId),
             true
         );
         if (!$row) {
@@ -660,14 +783,14 @@ class GrandAreaGame extends Table
     {
         self::DbQuery(
             "UPDATE player_state SET hand_json = " . $this->sqlString(json_encode(array_values($hand)))
-            . " WHERE game_id = " . intval(self::getGameId()) . " AND player_id = " . intval($playerId)
+            . " WHERE game_id = " . $this->gameId() . " AND player_id = " . intval($playerId)
         );
     }
 
     private function notifyHandCounts()
     {
         $rows = self::getObjectListFromDB(
-            "SELECT player_id, hand_json FROM player_state WHERE game_id = " . intval(self::getGameId())
+            "SELECT player_id, hand_json FROM player_state WHERE game_id = " . $this->gameId()
         );
         $counts = array();
         foreach ($rows as $row) {
@@ -722,7 +845,7 @@ class GrandAreaGame extends Table
 
     private function loadTerritoryState()
     {
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         $rows = self::getObjectListFromDB(
             "SELECT * FROM territories WHERE game_id = " . $gameId . " ORDER BY territory_key"
         );
@@ -744,7 +867,7 @@ class GrandAreaGame extends Table
 
     private function persistTerritoryState($state)
     {
-        $gameId = intval(self::getGameId());
+        $gameId = $this->gameId();
         foreach ($state as $key => $data) {
             $this->upsertTerritory($gameId, $key, $data);
         }
@@ -779,6 +902,7 @@ class GrandAreaGame extends Table
             'factionalDivision' => intval($this->value($data, 'factionalDivision', 0)),
             'fear' => intval($this->value($data, 'fear', 0)),
             'defiance' => intval($this->value($data, 'defiance', 0)),
+            'defianceMajorityRounds' => intval($this->value($data, 'defianceMajorityRounds', 0)),
             'armies' => intval($this->value($data, 'armies', 0)),
             'invaded' => $this->truthy($this->value($data, 'invaded', false)),
             'protected' => $this->truthy($this->value($data, 'protected', false)),
@@ -791,24 +915,9 @@ class GrandAreaGame extends Table
         self::DbQuery($sql);
     }
 
-    /**
-     * Prototype material still lives in frontend/data during the scaffold
-     * stage; bga/ sits one level below the repo root.
-     */
-    private function loadMaterialJson($file)
-    {
-        $path = dirname(__DIR__) . '/frontend/data/' . $file;
-        $json = file_get_contents($path);
-        $data = json_decode($json, true);
-        if (!is_array($data)) {
-            throw new BgaVisibleSystemException('Invalid material file: ' . $file);
-        }
-        return $data;
-    }
-
     private function crisisCardById($cardId)
     {
-        foreach ($this->loadMaterialJson('crisis.json') as $card) {
+        foreach ($this->crisisMaterial as $card) {
             if (isset($card['id']) && $card['id'] === $cardId) {
                 return $card;
             }
@@ -818,7 +927,7 @@ class GrandAreaGame extends Table
 
     private function playerCardById($cardId)
     {
-        foreach ($this->loadMaterialJson('playercards.json') as $card) {
+        foreach ($this->playerCardMaterial as $card) {
             if (isset($card['id']) && $card['id'] === $cardId) {
                 return $card;
             }
@@ -828,7 +937,7 @@ class GrandAreaGame extends Table
 
     private function balanceValue($key, $default)
     {
-        $balance = $this->loadMaterialJson('balance.json');
+        $balance = $this->balanceMaterial;
         if (isset($balance['actionEconomy']) && isset($balance['actionEconomy'][$key])) {
             return intval($balance['actionEconomy'][$key]);
         }
@@ -838,7 +947,7 @@ class GrandAreaGame extends Table
     private function persistRuntime($key, $value)
     {
         $sql = "REPLACE INTO game_runtime (game_id, state_key, state_json) VALUES ("
-            . intval(self::getGameId()) . ", "
+            . $this->gameId() . ", "
             . $this->sqlString($key) . ", "
             . $this->sqlString(json_encode($value)) . ")";
         self::DbQuery($sql);
@@ -847,7 +956,7 @@ class GrandAreaGame extends Table
     private function loadRuntime($key, $default)
     {
         $row = self::getObjectFromDb(
-            "SELECT state_json FROM game_runtime WHERE game_id = " . intval(self::getGameId()) . " AND state_key = " . $this->sqlString($key),
+            "SELECT state_json FROM game_runtime WHERE game_id = " . $this->gameId() . " AND state_key = " . $this->sqlString($key),
             true
         );
         if (!$row) {
@@ -879,7 +988,7 @@ class GrandAreaGame extends Table
     private function seedFor($purpose)
     {
         $salt = strval($this->loadRuntime('secret_salt', ''));
-        return intval(self::getGameId()) . ':' . $salt . ':' . intval(self::getGameStateValue('round_number')) . ':' . $purpose;
+        return $this->gameId() . ':' . $salt . ':' . intval(self::getGameStateValue('round_number')) . ':' . $purpose;
     }
 
     // ------------------------------------------------------------------

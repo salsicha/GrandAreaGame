@@ -40,13 +40,13 @@ Prototype mapping: `type: "Head"` and `clientOf: null`.
 
 Win condition in the prototype:
 
-- Win when wealth is at least `360` and every active client is compliant. With no active clients left, the compliance requirement is trivially met.
+- Win when wealth is at least `400` and every active client of the Head family is compliant. Other families' defiant clients do not block the win. With no active clients left, the compliance requirement is trivially met.
 
 Loss conditions in the prototype:
 
 - Lose when personal, political, or social capital reaches `0`.
 - Lose when an uprising collapses family control.
-- Lose when more than half of all active clients are defiant (a strict majority, counted across every active client in the game).
+- Lose to a defiant-client majority: at least `2` of the Head family's own active clients are defiant, they form a strict majority of the Head's active clients, and that majority stands at `2` consecutive cleanup phases. The engine tracks this on the Head's `defianceMajorityRounds` counter: each cleanup with a standing majority raises it by `1`, any cleanup without one resets it to `0`, and the Head is marked Lost while a majority stands and the counter is `2` or higher. A single defiant client can never topple the Head on its own, and rival hierarchies' defiant clients no longer count against it.
 
 ## Regional Family
 
@@ -138,7 +138,7 @@ Defiant clients require a response.
 - `MakeExample` targets one of the actor's own defiant clients, resets defiance to `0`, lowers target happiness by `20`, costs the actor `10` Social Capital, and gives the actor `5` Political Capital. The full Social Capital cost must be affordable or the action fails.
 - `Concession` targets one of the actor's own defiant clients, resets defiance to `0`, raises target happiness by `10`, costs the actor `10` wealth and `5` Political Capital, and gives the actor `5` Social Capital. Both costs must be affordable or the action fails.
 - Only the client's overlord can respond with `MakeExample` or `Concession`; third parties cannot farm the response reward.
-- Any defiant client left unanswered costs its overlord `5` Social Capital and `5` Political Capital during resolution. Eliminated clients and eliminated overlords are excluded from this pressure.
+- Any defiant client left unanswered costs its overlord `3` Social Capital and `3` Political Capital during resolution, capped at `9` Social Capital and `9` Political Capital per overlord per resolution no matter how many clients are defiant. Eliminated clients and eliminated overlords are excluded from this pressure.
 
 ## Resources
 
@@ -146,7 +146,7 @@ Resources are constraints, not just labels.
 
 - Territories use their own `resources` plus resources from compliant clients they control.
 - Compliant clients also use their overlord family's resources and the resources of compliant bloc-mates (clients of the same overlord). Defiance cuts a client off from the bloc pool, so choosing independence means accepting shortage pressure.
-- Missing each required resource costs `5` wealth, `2` development, and `2` happiness during cleanup.
+- Missing each required resource costs `5` wealth, `1` development, and `2` happiness during cleanup.
 - Missing `Oil` adds extra wealth loss equal to the territory's `armies`.
 - Global austerity is harsher for territories missing `Grain` or `Finance`.
 
@@ -159,6 +159,20 @@ Sentiment tracks political pressure inside a territory.
 - Educated happy clients increase `independenceSentiment`; educated unhappy territories increase `governanceChangeSentiment`.
 - `fear` suppresses governance-change growth.
 - Coup odds increase with target `governanceChangeSentiment` and `factionalDivision`, and decrease with target `fear`.
+
+## Cleanup Recovery And Collapse
+
+Cleanup resolves in a fixed order: capital-zero checks, protection and pressure decay, uprising checks, resource pressure, sentiment, recovery, comeback pressure, the defiant-majority counter update, then objectives.
+
+- Capital-zero checks run first: a family whose stash, Political Capital, or Social Capital is `0` at the start of cleanup collapses before any recovery applies. Recovery can slow a slide toward zero but never rescues a seat already at zero.
+- A family that has already achieved its objective can no longer collapse; the game ended for them at the moment of victory.
+- Uprisings are only risked when happiness is below both the family stash and the safe floor of `50`; a triggered check still has a `1 in 2` chance of collapse. A content public never revolts over a full family vault.
+- Recovery then applies to every surviving territory:
+  - Production: gain wealth equal to `3` plus `development / 20` (rounded down).
+  - Stash trickle: if stash is below `25` and wealth is at least `10`, move `2` wealth into stash.
+  - Civic regeneration: if happiness is at least `60`, gain `2` Social Capital and `2` Political Capital; regeneration never raises a capital above `150`.
+  - Unrest recovery: if happiness is below `70`, gain `4` happiness.
+- Recovery is deliberately smaller than any deliberate attack, so entropy no longer decides games but sustained pressure still does.
 
 ## Education And Development
 
@@ -179,7 +193,7 @@ Major actions are balanced around cost, target damage, and political side effect
 - `Invade` costs wealth and armies, marks the target invaded, damages wealth and happiness, raises fear and governance-change pressure, and increases client defiance. Invading a territory protected by another family costs the invader an extra `5` Political Capital and `5` Social Capital in backlash.
 - `Sanction` costs Political Capital, damages target wealth, happiness, and development, and creates governance-change pressure.
 - `Protect` costs wealth and stash, marks a protected relationship lasting `2` cleanup rounds, increases target happiness, reduces target fear, and can raise defiance if the target is another family's client. Protection expires when the `protectionDeal` counter reaches `0`.
-- `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success.
+- `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success. A successful coup transfers family control and resets the territory's defiant-majority counter: the new ruling family starts with a fresh grace period.
 - `DebtShakedown` costs Political Capital, converts target wealth into actor wealth, raises target debt, lowers happiness, and creates backlash.
 - `EconomicExploitation` costs Social Capital, extracts wealth and stash value, lowers target development and happiness, and creates backlash.
 
@@ -208,8 +222,8 @@ The prototype now uses ten playable world regions: `NorthAmerica`, `LatinAmerica
 
 - Starting setup fixtures exist for 2, 3, 4, and 5 players in `frontend/data/setups.json`.
 - Numeric ranges, action economy, comeback pressure, and client-victory thresholds live in `frontend/data/balance.json`.
-- `npm run simulate` runs a deterministic balance harness for repeated sample games.
-- When Head wealth reaches runaway levels, cleanup applies comeback pressure by reducing Head Social Capital, increasing direct-client defiance, and giving regional families rivalry momentum.
+- `npm run simulate` runs a deterministic balance harness for repeated sample games and reports per-seat deaths with round and cause.
+- When Head wealth reaches `300` or more, cleanup applies comeback pressure: the Head loses `6` Social Capital, the single unhappiest client of the Head family gains `1` defiance and `5` independence sentiment, and every regional family gains `4` Political Capital and `2` rivalry pressure. Emboldening only one client per cleanup keeps the pressure answerable with one response per round.
 
 ## Negotiation Hooks
 

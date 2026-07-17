@@ -49,6 +49,16 @@ class GrandAreaRules
         return grandarea_objectives();
     }
 
+    public static function recovery()
+    {
+        return grandarea_recovery();
+    }
+
+    public static function defiancePressure()
+    {
+        return grandarea_defiance_pressure();
+    }
+
     /**
      * Strict validation used at reveal time. Throws a player-visible
      * exception on malformed payloads.
@@ -695,7 +705,7 @@ class GrandAreaRules
                 $A['wealth'] = self::num($A, 'wealth') + $collected;
                 $T['wealth'] = max(0, self::num($T, 'wealth') - $collected);
                 $T['debt'] = self::num($T, 'debt') + $collected;
-                $T['happiness'] = max(0, self::num($T, 'happiness') - 12);
+                $T['happiness'] = max(0, self::num($T, 'happiness') - 8);
                 $T['governanceChangeSentiment'] = min(100, max(0, self::num($T, 'governanceChangeSentiment') + 7));
                 if (self::str($T, 'type') === 'Client') {
                     $T['defiance'] = self::num($T, 'defiance') + 1;
@@ -780,6 +790,7 @@ class GrandAreaRules
                 $roll = self::seededRoll($seed, $idx);
                 if ($roll < $base) {
                     $T['family'] = self::str($A, 'family') !== '' ? self::str($A, 'family') : self::str($T, 'family');
+                    $T['defianceMajorityRounds'] = 0; // new ruling family gets a fresh grace period
                     $T['happiness'] = max(0, self::num($T, 'happiness') - 20);
                     $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - max(0, 25 - $framing));
                     $A['politicalCapital'] = self::num($A, 'politicalCapital') + 10;
@@ -892,6 +903,8 @@ class GrandAreaRules
     {
         $logs = array();
         $newState = self::cloneTerritories($state);
+        $pressure = self::defiancePressure();
+        $defiantByOverlord = array();
 
         foreach (array_keys($newState) as $key) {
             $client = $newState[$key];
@@ -905,9 +918,22 @@ class GrandAreaRules
             if ($overlordKey === null || self::isEliminated($newState[$overlordKey])) {
                 continue;
             }
-            $newState[$overlordKey]['socialCapital'] = max(0, self::num($newState[$overlordKey], 'socialCapital') - 5);
-            $newState[$overlordKey]['politicalCapital'] = max(0, self::num($newState[$overlordKey], 'politicalCapital') - 5);
-            $logs[] = self::str($client, 'clientOf') . ' loses 5 Social Capital and 5 Political Capital for unanswered defiance in ' . $key;
+            $family = self::str($client, 'clientOf');
+            $defiantByOverlord[$family] = (isset($defiantByOverlord[$family]) ? $defiantByOverlord[$family] : 0) + 1;
+        }
+
+        ksort($defiantByOverlord, SORT_STRING);
+        foreach ($defiantByOverlord as $family => $count) {
+            $overlordKey = self::findOverlordKeyByName($newState, $family);
+            if ($overlordKey === null || self::isEliminated($newState[$overlordKey])) {
+                continue;
+            }
+            $socialPenalty = min($pressure['socialCapPerResolution'], $pressure['socialPerClient'] * $count);
+            $politicalPenalty = min($pressure['politicalCapPerResolution'], $pressure['politicalPerClient'] * $count);
+            $newState[$overlordKey]['socialCapital'] = max(0, self::num($newState[$overlordKey], 'socialCapital') - $socialPenalty);
+            $newState[$overlordKey]['politicalCapital'] = max(0, self::num($newState[$overlordKey], 'politicalCapital') - $politicalPenalty);
+            $logs[] = $family . ' loses ' . $socialPenalty . ' Social Capital and ' . $politicalPenalty
+                . ' Political Capital for unanswered defiance in ' . $count . ' client territor' . ($count === 1 ? 'y' : 'ies');
         }
 
         return array('newState' => $newState, 'logs' => $logs);
@@ -919,21 +945,10 @@ class GrandAreaRules
         $newState = self::cloneTerritories($state);
         $objectives = self::objectives();
 
-        $activeClients = 0;
-        $defiantClients = 0;
-        foreach ($newState as $data) {
-            if (self::isEliminated($data)) {
-                continue;
-            }
-            if (self::str($data, 'type') === 'Client') {
-                $activeClients++;
-                if (self::num($data, 'defiance') > 0) {
-                    $defiantClients++;
-                }
-            }
-        }
-        $clientDefianceMajority = $activeClients > 0 && $defiantClients * 2 > $activeClients;
-        $allClientsCompliant = $defiantClients === 0;
+        // Snapshot of active clients taken before any outcomes are marked in
+        // this pass, mirroring the entries/activeClients capture in
+        // frontend/rules.js evaluateObjectives.
+        $activeClients = self::activeClientSnapshot($newState);
 
         foreach (array_keys($newState) as $key) {
             $data =& $newState[$key];
@@ -944,7 +959,10 @@ class GrandAreaRules
             }
 
             $type = self::str($data, 'type');
-            if ($type === 'Head' && $clientDefianceMajority) {
+            $family = self::str($data, 'family');
+            if ($type === 'Head'
+                && self::ownClientMajorityDefiant($activeClients, $family)
+                && self::num($data, 'defianceMajorityRounds') >= GRANDAREA_HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE) {
                 self::markOutcome($logs, $key, $data, 'Lost', 'a majority of active clients are defiant');
             } elseif ($type === 'Regional' && self::num($data, 'happiness') <= 20) {
                 self::markOutcome($logs, $key, $data, 'Lost', 'domestic happiness collapsed');
@@ -957,7 +975,14 @@ class GrandAreaRules
                 continue;
             }
 
-            if ($type === 'Head' && self::num($data, 'wealth') >= $objectives['headWealthWin'] && $allClientsCompliant) {
+            $ownClientsCompliant = true;
+            foreach ($activeClients as $client) {
+                if ($client['clientOf'] === $family && $client['defiance'] > 0) {
+                    $ownClientsCompliant = false;
+                    break;
+                }
+            }
+            if ($type === 'Head' && self::num($data, 'wealth') >= $objectives['headWealthWin'] && $ownClientsCompliant) {
                 self::markOutcome($logs, $key, $data, 'Won', 'hierarchy is stable and head wealth target is met');
             } elseif ($type === 'Regional' && self::num($data, 'wealth') >= $objectives['regionalWealthWin'] && self::num($data, 'politicalCapital') >= $objectives['regionalPoliticalWin']) {
                 self::markOutcome($logs, $key, $data, 'Won', 'regional wealth and political power targets are met');
@@ -980,6 +1005,44 @@ class GrandAreaRules
         }
         $data['outcome'] = $outcome;
         $logs[] = $outcome . ': ' . $key . ' - ' . $reason;
+    }
+
+    /**
+     * clientOf/defiance snapshot of every active (non-eliminated) client,
+     * captured before a pass mutates any territory.
+     */
+    private static function activeClientSnapshot($state)
+    {
+        $clients = array();
+        foreach ($state as $data) {
+            if (self::str($data, 'type') === 'Client' && !self::isEliminated($data)) {
+                $clients[] = array(
+                    'clientOf' => self::str($data, 'clientOf'),
+                    'defiance' => self::num($data, 'defiance')
+                );
+            }
+        }
+        return $clients;
+    }
+
+    /**
+     * A Head only counts defiance among its OWN active clients: at least two
+     * defiant and a strict majority of the family's client roster.
+     */
+    private static function ownClientMajorityDefiant($activeClients, $family)
+    {
+        $own = 0;
+        $defiant = 0;
+        foreach ($activeClients as $client) {
+            if ($client['clientOf'] !== $family) {
+                continue;
+            }
+            $own++;
+            if ($client['defiance'] > 0) {
+                $defiant++;
+            }
+        }
+        return $defiant >= 2 && $defiant * 2 > $own;
     }
 
     /**
@@ -1056,22 +1119,125 @@ class GrandAreaRules
             }
         }
 
+        $sortedKeys = array_keys($newState);
+        sort($sortedKeys, SORT_STRING);
+
         foreach ($runawayHeads as $headKey) {
             $headFamily = self::str($newState[$headKey], 'family');
             $newState[$headKey]['socialCapital'] = max(0, self::num($newState[$headKey], 'socialCapital') - 6);
-            foreach (array_keys($newState) as $key) {
+            // Only the unhappiest of the runaway Head's clients is emboldened,
+            // so a Head can still answer the pressure with one response per
+            // round (ties break on sorted key order).
+            $emboldenedKey = null;
+            foreach ($sortedKeys as $key) {
                 if ($key === $headKey || self::isEliminated($newState[$key])) {
                     continue;
                 }
                 if (self::str($newState[$key], 'type') === 'Client' && self::str($newState[$key], 'clientOf') === $headFamily) {
-                    $newState[$key]['defiance'] = self::num($newState[$key], 'defiance') + 1;
-                    $newState[$key]['independenceSentiment'] = min(100, max(0, self::num($newState[$key], 'independenceSentiment') + 5));
+                    if ($emboldenedKey === null
+                        || self::num($newState[$key], 'happiness') < self::num($newState[$emboldenedKey], 'happiness')) {
+                        $emboldenedKey = $key;
+                    }
                 } elseif (self::str($newState[$key], 'type') === 'Regional') {
                     $newState[$key]['politicalCapital'] = self::num($newState[$key], 'politicalCapital') + 4;
                     $newState[$key]['rivalryPressure'] = self::num($newState[$key], 'rivalryPressure') + 2;
                 }
             }
+            if ($emboldenedKey !== null) {
+                $newState[$emboldenedKey]['defiance'] = self::num($newState[$emboldenedKey], 'defiance') + 1;
+                $newState[$emboldenedKey]['independenceSentiment'] = min(100, max(0, self::num($newState[$emboldenedKey], 'independenceSentiment') + 5));
+                $logs[] = 'Comeback pressure: ' . $emboldenedKey . ' is emboldened against ' . $headKey;
+            }
             $logs[] = 'Comeback pressure: ' . $headKey . ' runaway wealth strains the hierarchy';
+        }
+
+        return array('newState' => $newState, 'logs' => $logs);
+    }
+
+    /**
+     * Cleanup-phase recovery: a small deterministic economic and civic
+     * regeneration. Mirrors applyCleanupRecovery in frontend/rules.js.
+     */
+    public static function applyCleanupRecovery($state)
+    {
+        $logs = array();
+        $newState = self::cloneTerritories($state);
+        $recovery = self::recovery();
+
+        foreach (array_keys($newState) as $key) {
+            $data =& $newState[$key];
+            if (self::isEliminated($data)) {
+                unset($data);
+                continue;
+            }
+            $parts = array();
+
+            // 1. Production: every territory produces wealth from its development.
+            $production = $recovery['productionBase']
+                + intval(floor(self::num($data, 'development') / $recovery['productionDevelopmentDivisor']));
+            $data['wealth'] = self::num($data, 'wealth') + $production;
+            $parts[] = '+' . $production . ' wealth';
+
+            // 2. Stash trickle: poor family coffers skim a little national wealth.
+            if (self::num($data, 'stash') < $recovery['stashTrickleCeiling']
+                && self::num($data, 'wealth') >= $recovery['stashTrickleMinWealth']) {
+                $data['wealth'] = self::num($data, 'wealth') - $recovery['stashTrickle'];
+                $data['stash'] = self::num($data, 'stash') + $recovery['stashTrickle'];
+                $parts[] = '+' . $recovery['stashTrickle'] . ' stash from wealth';
+            }
+
+            // 3. Civic regeneration: content publics slowly rebuild capital.
+            if (self::num($data, 'happiness') >= $recovery['capitalRegenHappinessFloor']) {
+                if (self::num($data, 'socialCapital') < $recovery['capitalRegenCap']) {
+                    $data['socialCapital'] = min($recovery['capitalRegenCap'], self::num($data, 'socialCapital') + $recovery['capitalRegen']);
+                }
+                if (self::num($data, 'politicalCapital') < $recovery['capitalRegenCap']) {
+                    $data['politicalCapital'] = min($recovery['capitalRegenCap'], self::num($data, 'politicalCapital') + $recovery['capitalRegen']);
+                }
+                $parts[] = '+' . $recovery['capitalRegen'] . ' Social/Political Capital';
+            }
+
+            // 4. Unrest exhaustion: miserable publics drift back toward normalcy.
+            if (self::num($data, 'happiness') < $recovery['happinessRecoveryCeiling']) {
+                $data['happiness'] = min(200, max(0, self::num($data, 'happiness') + $recovery['happinessRecovery']));
+                $parts[] = '+' . $recovery['happinessRecovery'] . ' happiness';
+            }
+
+            $logs[] = 'Recovery for ' . $key . ': ' . implode(', ', $parts);
+            unset($data);
+        }
+
+        return array('newState' => $newState, 'logs' => $logs);
+    }
+
+    /**
+     * A defiant-client majority must stand through consecutive cleanup phases
+     * before it topples a Head. The counter rises by 1 per cleanup while the
+     * majority holds and resets to 0 the moment it breaks. Mirrors
+     * updateDefianceMajorityCounters in frontend/rules.js.
+     */
+    public static function updateDefianceMajorityCounters($state)
+    {
+        $logs = array();
+        $newState = self::cloneTerritories($state);
+        $activeClients = self::activeClientSnapshot($newState);
+
+        foreach (array_keys($newState) as $key) {
+            $data =& $newState[$key];
+            if (self::str($data, 'type') !== 'Head' || self::isEliminated($data)) {
+                unset($data);
+                continue;
+            }
+            $majority = self::ownClientMajorityDefiant($activeClients, self::str($data, 'family'));
+            $previous = self::num($data, 'defianceMajorityRounds');
+            $data['defianceMajorityRounds'] = $majority ? $previous + 1 : 0;
+            if ($majority) {
+                $logs[] = 'Defiant-client majority stands against ' . $key
+                    . ' (cleanup ' . $data['defianceMajorityRounds'] . ' of ' . GRANDAREA_HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE . ')';
+            } elseif ($previous > 0) {
+                $logs[] = 'Defiant-client majority broken before it could topple ' . $key;
+            }
+            unset($data);
         }
 
         return array('newState' => $newState, 'logs' => $logs);
@@ -1091,7 +1257,7 @@ class GrandAreaRules
                 continue;
             }
             $wealthLoss = count($missing) * 5 + (in_array('Oil', $missing, true) ? self::num($newState[$key], 'armies') : 0);
-            $developmentLoss = count($missing) * 2;
+            $developmentLoss = count($missing);
             $happinessLoss = count($missing) * 2;
             $newState[$key]['wealth'] = max(0, self::num($newState[$key], 'wealth') - $wealthLoss);
             $newState[$key]['development'] = max(0, self::num($newState[$key], 'development') - $developmentLoss);
@@ -1158,7 +1324,8 @@ class GrandAreaRules
     /**
      * Cleanup pipeline, matching frontend/rules.js resolveCleanup:
      * capital checks / counters / protection expiry / uprising ->
-     * resource pressure -> sentiment -> comeback pressure -> objectives.
+     * resource pressure -> sentiment -> recovery -> comeback pressure ->
+     * defiance-majority counters -> objectives.
      */
     public static function resolveCleanup($state, $seed)
     {
@@ -1172,6 +1339,13 @@ class GrandAreaRules
                 continue;
             }
             if (self::str($data, 'family') === 'Anarchy' || self::str($data, 'family') === 'Collapsed') {
+                unset($data);
+                continue;
+            }
+
+            // A family that has already achieved its objective can no longer
+            // collapse: the game ended for them at the moment of victory.
+            if (self::str($data, 'outcome') === 'Won') {
                 unset($data);
                 continue;
             }
@@ -1204,7 +1378,10 @@ class GrandAreaRules
             $data['realignmentPressure'] = max(0, self::num($data, 'realignmentPressure') - 1);
             $data['rivalryPressure'] = max(0, self::num($data, 'rivalryPressure') - 1);
 
-            if (self::num($data, 'happiness') < self::num($data, 'stash')) {
+            // Uprising check: Happiness < Personal Capital (Stash), but only
+            // a genuinely miserable public revolts (below the safe floor).
+            if (self::num($data, 'happiness') < self::num($data, 'stash')
+                && self::num($data, 'happiness') < GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR) {
                 if (self::seededRoll($seed, $key) < 0.5) {
                     $logs[] = 'UPRISING in ' . $key . '! Happiness (' . self::num($data, 'happiness') . ') < Stash (' . self::num($data, 'stash') . '). The Family falls!';
                     $data['family'] = 'Anarchy';
@@ -1220,12 +1397,22 @@ class GrandAreaRules
 
         $resourceResult = self::resolveResourcePressure($newState);
         $sentimentResult = self::resolveSentiment($resourceResult['newState']);
-        $comebackResult = self::applyComebackPressure($sentimentResult['newState']);
-        $objectiveResult = self::evaluateObjectives($comebackResult['newState']);
+        $recoveryResult = self::applyCleanupRecovery($sentimentResult['newState']);
+        $comebackResult = self::applyComebackPressure($recoveryResult['newState']);
+        $majorityResult = self::updateDefianceMajorityCounters($comebackResult['newState']);
+        $objectiveResult = self::evaluateObjectives($majorityResult['newState']);
 
         return array(
             'newState' => $objectiveResult['newState'],
-            'logs' => array_merge($logs, $resourceResult['logs'], $sentimentResult['logs'], $comebackResult['logs'], $objectiveResult['logs'])
+            'logs' => array_merge(
+                $logs,
+                $resourceResult['logs'],
+                $sentimentResult['logs'],
+                $recoveryResult['logs'],
+                $comebackResult['logs'],
+                $majorityResult['logs'],
+                $objectiveResult['logs']
+            )
         );
     }
 
@@ -1242,6 +1429,10 @@ class GrandAreaRules
         $newState = self::cloneTerritories($state);
         $hasA = isset($newState[$actorKey]);
         $hasT = $targetKey !== null && isset($newState[$targetKey]);
+        if ($hasA && self::isEliminated($newState[$actorKey])) {
+            $logs[] = $actorKey . ' is eliminated and cannot play cards';
+            return array('newState' => $newState, 'logs' => $logs);
+        }
         if ($hasA) {
             $A =& $newState[$actorKey];
         } else {

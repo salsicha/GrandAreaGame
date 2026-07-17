@@ -1,0 +1,47 @@
+/* Grand Area — BGA client styles */
+
+#grandarea_table{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+#grandarea_board{flex:1 1 620px;min-width:460px;background:#f6fbff;border:1px solid #d7e3ec;border-radius:8px;padding:8px}
+#grandarea_map svg{width:100%;height:auto;display:block}
+#grandarea_side_panel{flex:0 1 340px;min-width:280px}
+#grandarea_side_panel h3{margin:4px 0 8px}
+
+/* Map: labels and territories (mirrors the frontend prototype styling) */
+#grandarea_map .label{font-family:Inter,Arial,sans-serif;fill:#22303a;font-size:15px;font-weight:600;letter-spacing:.02em;pointer-events:none;paint-order:stroke;stroke:#f6fbff;stroke-width:3px;stroke-linejoin:round}
+#grandarea_map .territory{stroke:#54707e;stroke-width:.8;stroke-linejoin:round;cursor:pointer;transition:fill .15s,stroke .15s}
+#grandarea_map .map-underlay{pointer-events:none}
+#grandarea_map .map-borders{pointer-events:none}
+#grandarea_map .territory:hover{fill:#ffeaa7}
+#grandarea_map .territory.selected{stroke:#111827;stroke-width:2}
+#grandarea_map .overlay-head{fill:#74b9ff}
+#grandarea_map .overlay-regional{fill:#55efc4}
+#grandarea_map .overlay-client{fill:#ffeaa7}
+#grandarea_map .territory.defiant{fill:#ff7675}
+#grandarea_map .territory.eliminated{fill:#b2bec3;opacity:.65}
+#grandarea_map .territory.invaded{stroke:#d63031;stroke-width:2.5}
+#grandarea_map .territory.sanctioned{stroke:#6c5ce7;stroke-width:2.5}
+#grandarea_map .territory.protected{stroke:#00b894;stroke-width:2.5}
+
+/* Side panel */
+.grandarea-panel-row{margin:4px 0;font-size:13px;color:#2d3436}
+.grandarea-panel-block{margin:10px 0;padding:8px;background:#ffffff;border:1px solid #e3ecf2;border-radius:6px}
+.grandarea-field{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0;font-size:13px}
+.grandarea-field select,.grandarea-field input{max-width:180px}
+#grandarea_action_builder .bgabutton{display:block;margin:6px 0;text-align:center}
+#grandarea_commit_status{font-weight:600}
+#grandarea_selected table{width:100%;border-collapse:collapse;font-size:12px}
+#grandarea_selected td{padding:1px 4px;border-bottom:1px solid #f0f4f7}
+#grandarea_selected td:last-child{text-align:right}
+
+/* Hand */
+.grandarea-card{border:1px solid #dfe6e9;border-radius:6px;padding:6px 8px;margin:6px 0;background:#fdfefe}
+.grandarea-card strong{display:block;font-size:13px}
+.grandarea-card small{display:block;color:#57606f;margin:2px 0 6px}
+
+/* Log */
+#grandarea_log{max-height:280px;overflow-y:auto}
+.grandarea-log-entry{padding:2px 0;border-bottom:1px solid #f0f4f7;font-size:12px;color:#2d3436}
+
+@media (max-width: 720px){
+  #grandarea_board{min-width:0}
+}

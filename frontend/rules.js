@@ -10,7 +10,7 @@
 */
 (function(){
   const OBJECTIVES = {
-    headWealthWin: 360,
+    headWealthWin: 400,
     regionalWealthWin: 320,
     regionalPoliticalWin: 130,
     clientHappinessWin: 120,
@@ -18,6 +18,29 @@
     clientIndependenceWin: 60,
     headRunawayWealth: 300
   };
+
+  const RECOVERY = {
+    productionBase: 3,
+    productionDevelopmentDivisor: 20,
+    stashTrickle: 2,
+    stashTrickleCeiling: 25,
+    stashTrickleMinWealth: 10,
+    capitalRegen: 2,
+    capitalRegenHappinessFloor: 60,
+    capitalRegenCap: 150,
+    happinessRecovery: 4,
+    happinessRecoveryCeiling: 70
+  };
+
+  const DEFIANCE_PRESSURE = {
+    socialPerClient: 3,
+    politicalPerClient: 3,
+    socialCapPerResolution: 9,
+    politicalCapPerResolution: 9
+  };
+
+  const UPRISING_HAPPINESS_SAFE_FLOOR = 50;
+  const HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE = 2;
 
   const ROUND_PHASES = ['Crisis','Tribute','Secret Action Submission','Reveal','Narrative Battle','Resolution','Cleanup'];
 
@@ -136,7 +159,7 @@
       const missing = missingResourcesFor(key, newState);
       if(missing.length === 0) return;
       const wealthLoss = missing.length * 5 + (missing.includes('Oil') ? (data.armies || 0) : 0);
-      const developmentLoss = missing.length * 2;
+      const developmentLoss = missing.length;
       const happinessLoss = missing.length * 2;
       data.wealth = clamp((data.wealth || 0) - wealthLoss, 0);
       data.development = clamp((data.development || 0) - developmentLoss, 0);
@@ -323,9 +346,12 @@
     const entries = Object.entries(newState);
     const activeEntries = entries.filter(([, data]) => !isEliminated(data));
     const activeClients = activeEntries.filter(([, data]) => data.type === 'Client');
-    const defiantClients = activeClients.filter(([, data]) => (data.defiance || 0) > 0);
-    const clientDefianceMajority = activeClients.length > 0 && defiantClients.length * 2 > activeClients.length;
-    const allClientsCompliant = defiantClients.length === 0;
+
+    function ownClientMajorityDefiant(family){
+      const own = activeClients.filter(([, client]) => client.clientOf === family);
+      const defiant = own.filter(([, client]) => (client.defiance || 0) > 0);
+      return defiant.length >= 2 && defiant.length * 2 > own.length;
+    }
 
     entries.forEach(([key, data])=>{
       if(data.family === 'Anarchy' || data.family === 'Collapsed'){
@@ -333,7 +359,7 @@
         return;
       }
 
-      if(data.type === 'Head' && clientDefianceMajority){
+      if(data.type === 'Head' && ownClientMajorityDefiant(data.family) && (data.defianceMajorityRounds || 0) >= HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE){
         markOutcome(logs, key, data, 'Lost', 'a majority of active clients are defiant');
       } else if(data.type === 'Regional' && (data.happiness || 0) <= 20){
         markOutcome(logs, key, data, 'Lost', 'domestic happiness collapsed');
@@ -343,7 +369,8 @@
 
       if(data.outcome === 'Lost') return;
 
-      if(data.type === 'Head' && (data.wealth || 0) >= OBJECTIVES.headWealthWin && allClientsCompliant){
+      const ownClientsCompliant = activeClients.every(([, client]) => client.clientOf !== data.family || (client.defiance || 0) === 0);
+      if(data.type === 'Head' && (data.wealth || 0) >= OBJECTIVES.headWealthWin && ownClientsCompliant){
         markOutcome(logs, key, data, 'Won', 'hierarchy is stable and head wealth target is met');
       } else if(data.type === 'Regional' && (data.wealth || 0) >= OBJECTIVES.regionalWealthWin && (data.politicalCapital || 0) >= OBJECTIVES.regionalPoliticalWin){
         markOutcome(logs, key, data, 'Won', 'regional wealth and political power targets are met');
@@ -405,6 +432,7 @@
   function applyUnansweredDefiancePressure(state){
     const logs = [];
     const newState = cloneTerritories(state);
+    const defiantByOverlord = {};
 
     Object.keys(newState).forEach(key=>{
       const client = newState[key];
@@ -412,9 +440,18 @@
       if(isEliminated(client)) return;
       const overlord = findOverlordTerritory(newState, client);
       if(!overlord || isEliminated(overlord)) return;
-      overlord.socialCapital = clamp((overlord.socialCapital || 0) - 5, 0);
-      overlord.politicalCapital = clamp((overlord.politicalCapital || 0) - 5, 0);
-      logs.push(`${client.clientOf} loses 5 Social Capital and 5 Political Capital for unanswered defiance in ${key}`);
+      defiantByOverlord[client.clientOf] = (defiantByOverlord[client.clientOf] || 0) + 1;
+    });
+
+    Object.keys(defiantByOverlord).sort().forEach(family=>{
+      const overlord = findOverlordTerritory(newState, { clientOf: family });
+      if(!overlord || isEliminated(overlord)) return;
+      const count = defiantByOverlord[family];
+      const socialPenalty = Math.min(DEFIANCE_PRESSURE.socialCapPerResolution, DEFIANCE_PRESSURE.socialPerClient * count);
+      const politicalPenalty = Math.min(DEFIANCE_PRESSURE.politicalCapPerResolution, DEFIANCE_PRESSURE.politicalPerClient * count);
+      overlord.socialCapital = clamp((overlord.socialCapital || 0) - socialPenalty, 0);
+      overlord.politicalCapital = clamp((overlord.politicalCapital || 0) - politicalPenalty, 0);
+      logs.push(`${family} loses ${socialPenalty} Social Capital and ${politicalPenalty} Political Capital for unanswered defiance in ${count} client territor${count === 1 ? 'y' : 'ies'}`);
     });
 
     return { newState, logs };
@@ -431,18 +468,101 @@
     runawayHeads.forEach(headKey=>{
       const head = newState[headKey];
       head.socialCapital = clamp((head.socialCapital||0) - 6, 0);
-      Object.keys(newState).forEach(key=>{
+      // Only the unhappiest of the runaway Head's clients is emboldened, so a
+      // Head can still answer the pressure with one response per round.
+      let emboldenedKey = null;
+      Object.keys(newState).sort().forEach(key=>{
         const data = newState[key];
         if(isEliminated(data) || key === headKey) return;
         if(data.type === 'Client' && data.clientOf === head.family){
-          data.defiance = (data.defiance||0) + 1;
-          data.independenceSentiment = clamp((data.independenceSentiment||0) + 5, 0, 100);
+          if(emboldenedKey == null || (data.happiness || 0) < (newState[emboldenedKey].happiness || 0)){
+            emboldenedKey = key;
+          }
         } else if(data.type === 'Regional'){
           data.politicalCapital = (data.politicalCapital||0) + 4;
           data.rivalryPressure = (data.rivalryPressure||0) + 2;
         }
       });
+      if(emboldenedKey){
+        const client = newState[emboldenedKey];
+        client.defiance = (client.defiance||0) + 1;
+        client.independenceSentiment = clamp((client.independenceSentiment||0) + 5, 0, 100);
+        logs.push(`Comeback pressure: ${emboldenedKey} is emboldened against ${headKey}`);
+      }
       logs.push(`Comeback pressure: ${headKey} runaway wealth strains the hierarchy`);
+    });
+
+    return { newState, logs };
+  }
+
+  // Cleanup-phase recovery: a small deterministic economic and civic
+  // regeneration that keeps entropy from deciding games while leaving every
+  // deliberate attack strictly stronger than the regeneration it fights.
+  function applyCleanupRecovery(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+
+    Object.keys(newState).forEach(key=>{
+      const data = newState[key];
+      if(isEliminated(data)) return;
+      const parts = [];
+
+      // 1. Production: every territory produces wealth from its development.
+      const production = RECOVERY.productionBase + Math.floor((data.development || 0) / RECOVERY.productionDevelopmentDivisor);
+      data.wealth = (data.wealth || 0) + production;
+      parts.push(`+${production} wealth`);
+
+      // 2. Stash trickle: poor family coffers skim a little national wealth.
+      if((data.stash || 0) < RECOVERY.stashTrickleCeiling && (data.wealth || 0) >= RECOVERY.stashTrickleMinWealth){
+        data.wealth -= RECOVERY.stashTrickle;
+        data.stash = (data.stash || 0) + RECOVERY.stashTrickle;
+        parts.push(`+${RECOVERY.stashTrickle} stash from wealth`);
+      }
+
+      // 3. Civic regeneration: content publics slowly rebuild capital.
+      if((data.happiness || 0) >= RECOVERY.capitalRegenHappinessFloor){
+        if((data.socialCapital || 0) < RECOVERY.capitalRegenCap){
+          data.socialCapital = Math.min(RECOVERY.capitalRegenCap, (data.socialCapital || 0) + RECOVERY.capitalRegen);
+        }
+        if((data.politicalCapital || 0) < RECOVERY.capitalRegenCap){
+          data.politicalCapital = Math.min(RECOVERY.capitalRegenCap, (data.politicalCapital || 0) + RECOVERY.capitalRegen);
+        }
+        parts.push(`+${RECOVERY.capitalRegen} Social/Political Capital`);
+      }
+
+      // 4. Unrest exhaustion: miserable publics drift back toward normalcy.
+      if((data.happiness || 0) < RECOVERY.happinessRecoveryCeiling){
+        data.happiness = clamp((data.happiness || 0) + RECOVERY.happinessRecovery, 0, 200);
+        parts.push(`+${RECOVERY.happinessRecovery} happiness`);
+      }
+
+      logs.push(`Recovery for ${key}: ${parts.join(', ')}`);
+    });
+
+    return { newState, logs };
+  }
+
+  // A defiant-client majority must stand through consecutive cleanup phases
+  // before it topples a Head. The counter rises by 1 per cleanup while the
+  // majority holds and resets to 0 the moment it breaks.
+  function updateDefianceMajorityCounters(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+    const entries = Object.entries(newState);
+    const activeClients = entries.filter(([, data]) => data.type === 'Client' && !isEliminated(data));
+
+    entries.forEach(([key, data])=>{
+      if(data.type !== 'Head' || isEliminated(data)) return;
+      const own = activeClients.filter(([, client]) => client.clientOf === data.family);
+      const defiant = own.filter(([, client]) => (client.defiance || 0) > 0);
+      const majority = defiant.length >= 2 && defiant.length * 2 > own.length;
+      const previous = data.defianceMajorityRounds || 0;
+      data.defianceMajorityRounds = majority ? previous + 1 : 0;
+      if(majority){
+        logs.push(`Defiant-client majority stands against ${key} (cleanup ${data.defianceMajorityRounds} of ${HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE})`);
+      } else if(previous > 0){
+        logs.push(`Defiant-client majority broken before it could topple ${key}`);
+      }
     });
 
     return { newState, logs };
@@ -652,7 +772,7 @@
           A.wealth = (A.wealth||0) + collected;
           T.wealth = clamp((T.wealth||0) - collected, 0);
           T.debt = (T.debt||0) + collected;
-          T.happiness = clamp((T.happiness||0) - 12, 0);
+          T.happiness = clamp((T.happiness||0) - 8, 0);
           T.governanceChangeSentiment = clamp((T.governanceChangeSentiment||0) + 7, 0, 100);
           if(T.type === 'Client') T.defiance = (T.defiance||0) + 1;
           logs.push(`${actor} forced debt payments from ${target} (+${collected} wealth, target debt +${collected})`);
@@ -719,6 +839,7 @@
           if(roll < base){
             // successful coup: replace target's family control (simplified)
             T.family = A.family || T.family;
+            T.defianceMajorityRounds = 0; // new ruling family gets a fresh grace period
             T.happiness = clamp((T.happiness||0) - 20, 0);
             A.socialCapital = clamp((A.socialCapital||0) - Math.max(0, 25 - framing), 0);
             A.politicalCapital = (A.politicalCapital||0) + 10;
@@ -811,6 +932,10 @@
       // Skip if already eliminated
       if(data.family === 'Anarchy' || data.family === 'Collapsed') return;
 
+      // A family that has already achieved its objective can no longer
+      // collapse: the game ended for them at the moment of victory.
+      if(data.outcome === 'Won') return;
+
       // 1. Capital Checks (Zero Tolerance)
       // Design: "When any of their capital values reach zero they lose"
       if((data.stash||0) <= 0){
@@ -840,8 +965,9 @@
       data.realignmentPressure = Math.max(0, (data.realignmentPressure || 0) - 1);
       data.rivalryPressure = Math.max(0, (data.rivalryPressure || 0) - 1);
 
-      // 2. Uprising Check: Happiness < Personal Capital (Stash)
-      if((data.happiness || 0) < (data.stash || 0)){
+      // 2. Uprising Check: Happiness < Personal Capital (Stash), but only a
+      // genuinely miserable public revolts (happiness below the safe floor).
+      if((data.happiness || 0) < (data.stash || 0) && (data.happiness || 0) < UPRISING_HAPPINESS_SAFE_FLOOR){
         // Design: "If you fail, your people revolt." (Simulated with 50% chance)
         if(random() < 0.5){
           logs.push(`☠️ UPRISING in ${family}! Happiness (${data.happiness}) < Stash (${data.stash}). The Family falls!`);
@@ -857,9 +983,11 @@
 
     const resourceResult = resolveResourcePressure(newState);
     const sentimentResult = resolveSentiment(resourceResult.newState);
-    const comebackResult = applyComebackPressure(sentimentResult.newState);
-    const objectiveResult = evaluateObjectives(comebackResult.newState);
-    return { newState: objectiveResult.newState, logs: logs.concat(resourceResult.logs, sentimentResult.logs, comebackResult.logs, objectiveResult.logs) };
+    const recoveryResult = applyCleanupRecovery(sentimentResult.newState);
+    const comebackResult = applyComebackPressure(recoveryResult.newState);
+    const majorityResult = updateDefianceMajorityCounters(comebackResult.newState);
+    const objectiveResult = evaluateObjectives(majorityResult.newState);
+    return { newState: objectiveResult.newState, logs: logs.concat(resourceResult.logs, sentimentResult.logs, recoveryResult.logs, comebackResult.logs, majorityResult.logs, objectiveResult.logs) };
   }
 
   function resolveTribute(state){
@@ -922,6 +1050,11 @@
     const newState = cloneTerritories(state);
     const A = newState[actor];
     const T = newState[target]; // target might be null if Self
+
+    if(A && isEliminated(A)){
+      logs.push(`${actor} is eliminated and cannot play cards`);
+      return { newState, logs };
+    }
 
     logs.push(`🃏 ${actor} plays ${cardId} on ${target||'Self'}`);
 
@@ -1070,5 +1203,5 @@
     return { newState, logs };
   }
 
-  window.Rules = { OBJECTIVES, ROUND_PHASES, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, resolveResourcePressure, resolveSentiment, availableResourcesFor };
+  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
 })();

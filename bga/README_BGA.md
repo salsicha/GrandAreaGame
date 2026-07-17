@@ -1,17 +1,17 @@
 # BGA Integration Notes
 
-This folder is the production-facing BGA scaffold. The browser prototype can preview play, but authoritative game resolution belongs to `GrandAreaRules.php` and `GrandAreaGame`.
+This folder is a complete Board Game Arena Studio project laid out in BGA's required structure (`dbmodel.sql`, root-level `grandareagame.js` / `grandareagame.css` / `grandareagame_grandareagame.tpl`, `modules/php/`). The browser prototype can preview play, but authoritative game resolution belongs to `GrandAreaRules.php` and `GrandAreaGame`. For the step-by-step path to publication, see [PUBLISHING.md](PUBLISHING.md).
 
 ## Current Server Flow
 
-1. `setupNewGame()` inserts players into the framework `player` table with colors, assigns families deterministically from `frontend/data/setups.json` by player order (territory order fallback), loads prototype material JSON, initializes territories, builds decks, deals starting hands, stores a secret per-game salt, and initializes statistics.
-2. The state machine starts at the mandatory `gameSetup` state (id 1) and then cycles `crisis -> tribute -> actionSubmission -> reveal -> narrativeBattle -> resolution -> cleanup -> crisis`. Multiactive phases activate all players on entry and advance when every player has acted or ended their turn.
-3. `stCrisis()` draws (reshuffling the discard when needed), publishes the drawn card, and deals each player a round card up to the hand limit from `frontend/data/balance.json`.
+1. `setupNewGame()` inserts players into the framework `player` table with colors, assigns families deterministically from the embedded setup fixtures by player order (territory order fallback), initializes territories from embedded material, builds decks, deals starting hands, stores a secret per-game salt, and initializes statistics.
+2. The state machine starts at the mandatory `gameSetup` state (id 1) and then cycles `crisis -> tribute -> actionSubmission -> reveal -> narrativeBattle -> resolution -> cleanup -> crisis`. Multiactive phases activate all players on entry, auto-skip eliminated players (submission) and players without a commitment (reveal), and advance when every remaining player has acted or ended their turn.
+3. `stCrisis()` draws (reshuffling the discard when needed), publishes the drawn card, and deals each player a round card up to the embedded hand limit.
 4. Players submit SHA-256 commits for secret actions through `submitCommit`; commits are scoped to the current round and are locked once any reveal has happened in the round.
 5. Players reveal payload plus nonce through `reveal`; the server recomputes the commit hash, validates action, target, phase (via `checkAction`), and family ownership, and marks the player done with the phase.
 6. `stResolution()` gathers revealed payloads and calls `GrandAreaRules::resolveTurn()`, which runs the full pipeline in the reference-engine order: crisis application, actions, unanswered-defiance pressure, objective evaluation, defiance contagion, and a final objective pass. The applied crisis card moves to the discard and the round's submissions are deleted.
 7. `stCleanup()` calls `GrandAreaRules::resolveCleanup()` (capital checks, uprising, counter decay, protection expiry, resource-shortage pressure, sentiment growth, comeback pressure, objectives), persists outcomes, and advances the round.
-8. Both resolution and cleanup check for game end (any `Won` outcome, or all but one player eliminated); winners score `1` and `player_score_aux` carries family wealth as the tiebreak.
+8. Both resolution and cleanup check for game end (any `Won` outcome, all but one player eliminated, or the round limit from the "Game length" option reached — 12/20/30 rounds). Objective winners score `1000 + wealth`, other survivors score their family wealth, eliminated players score `0`; `player_score_aux` carries wealth as the tiebreak. The round limit guarantees every game terminates.
 
 ## Determinism And Seeds
 
@@ -27,17 +27,23 @@ This folder is the production-facing BGA scaffold. The browser prototype can pre
 - `game_runtime` stores deck order, discards, the current crisis, the secret salt, and revealed payload audit data.
 - Public notifications never include unrevealed hand contents or unrevealed payloads.
 
-## Material Migration
+## Material
 
-Prototype JSON remains the source for initial BGA material during this scaffold stage:
+The module is fully self-contained: `material.inc.php` is GENERATED from the prototype JSON fixtures (`frontend/data/*.json`) and embeds territories, crisis cards, all 17 player cards, setup fixtures, and balance knobs as PHP arrays. Nothing under `bga/` reads outside the game folder at runtime.
 
-- `frontend/data/territories.json` maps to `territories`.
-- `frontend/data/crisis.json` maps to `game_runtime.crisis_draw` and crisis metadata.
-- `frontend/data/playercards.json` maps to `game_runtime.player_deck` and player hands (all 17 cards, 3 copies each).
-- `frontend/data/balance.json` supplies the hand limit and per-round deal count.
-- `frontend/data/setups.json` supplies family assignment fixtures for 2-5 players.
+After changing any source JSON, regenerate with:
 
-When the module stabilizes, move these JSON records into BGA-native PHP constants in `material.inc.php` and keep a migration script or checklist for syncing changes.
+```
+node tools/generate-bga-material.js
+```
+
+The board template embeds `frontend/map.svg`; after regenerating the map, rebuild the template with:
+
+```
+node tools/generate-bga-board.js
+```
+
+A repo test verifies the embedded material checksum matches the JSON sources, so drift fails CI.
 
 ## Validation Rules
 
@@ -52,10 +58,13 @@ When the module stabilizes, move these JSON records into BGA-native PHP constant
 
 `modules/php/GrandAreaRules.php` is a line-for-line port of `frontend/rules.js`: per-action math (including Coup/Invade framing, Protect vs ProtectionDeal, protected-target invasion backlash, overlord-only defiance responses), the shared resource-bloc model, crisis targeting scopes, contagion as a single deterministic wave, tribute lapses, eliminated-actor rules, objective thresholds (`grandarea_objectives()`), and the happiness cap of 200. RNG sequencing differs (the PHP side uses per-step SHA-256 rolls instead of the JS LCG), so replays are deterministic per engine but not cross-engine.
 
+## Client
+
+The Dojo client (`grandareagame.js` + `grandareagame_grandareagame.tpl` + `grandareagame.css`) renders the world-map board with role/status overlays and click-to-select, a territory inspector, an action builder (action/target/framing filtered to server-acceptable choices), the commit/reveal flow (SHA-256 via `crypto.subtle`, nonce + payload stored in `localStorage` per table/round), the player's hand with play buttons, and a running game log. A player who loses their stored secret (different browser/device) can always End Turn instead of revealing.
+
 ## Remaining BGA Work
 
-- The Dojo client is still a minimal log/console view: it renders notifications, the round, the crisis, the player's own hand as text, and an End Turn button. It does not yet render the map, build commit hashes, or offer action/target pickers, so full games currently need a scripted or API-driven client.
-- The state machine, multiactive handoffs, `getAllDatas()`, progression, and scoring follow documented Table APIs but have not been exercised inside a real BGA sandbox; expect framework-fit fixes (notification message strings, `argGameEnd`, reflexion time tuning) on first deployment.
-- Translation strings exist only for state descriptions; visible notification text still needs `clienttranslate` wrapping once the client UI stabilizes.
+- The state machine, multiactive handoffs, `getAllDatas()`, progression, and scoring follow documented Table APIs but have not been exercised inside a real BGA sandbox; expect framework-fit fixes (notification message strings, `argGameEnd`, reflexion time tuning) on first deployment. See PUBLISHING.md for the Studio test plan.
+- Visible notification text still needs `clienttranslate` wrapping and message arguments once the interface stabilizes in Studio.
 - Spectator payload shaping beyond hand-count masking has not been tested.
-- Material still loads from `frontend/data` JSON rather than `material.inc.php` constants.
+- `img/game_box.png`, `img/game_icon.png`, and `img/game_banner.png` are map-derived placeholders; replace them with real art before release (see PUBLISHING.md).
