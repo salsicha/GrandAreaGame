@@ -236,7 +236,7 @@ test('actions are consolidated into the turn manager', () => {
   assert.doesNotMatch(app, /function wireButtons\(/);
   assert.doesNotMatch(app, /action-skim|action-prop|action-invade/);
   assert.doesNotMatch(html, /id=["']actions["']|action-skim|action-prop|action-invade/);
-  assert.match(app, /const ACTIONS = \['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','CounterIntel','Fortify','MakeExample','Concession','Educate','Develop'\]/);
+  assert.match(app, /const ACTIONS = \['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','CounterIntel','Fortify','MakeExample','Concession','Educate','Develop','Mobilize','Launder','Crackdown','GeneralStrike','Solidarity'\]/);
   assert.match(app, /const ROUND_PHASES = \['Crisis','Tribute','Secret Action Submission','Reveal','Narrative Battle','Resolution','Cleanup'\]/);
   assert.match(app, /phases: ROUND_PHASES\.slice\(\)/);
 });
@@ -1609,6 +1609,104 @@ test('narrative plays are validated and limited to one per family', () => {
   assert.ok(result.logs.some(line => line.includes('failed Smear (cannot smear yourself)')));
 });
 
+test('mobilize, launder, and crackdown manage military, covert, and domestic tracks', () => {
+  const Rules = loadRules();
+  const mobilized = Rules.resolveTurn({
+    Oiler: territory({ family: 'OilerFam', wealth: 50, armies: 2, fear: 10, resources: ['Oil'] })
+  }, [{ family: 'Oiler', action: 'Mobilize', target: 'Self' }]);
+  assert.equal(mobilized.newState.Oiler.armies, 3);
+  assert.equal(mobilized.newState.Oiler.wealth, 40);
+  assert.equal(mobilized.newState.Oiler.fear, 11);
+
+  const dry = Rules.resolveTurn({
+    Dry: territory({ family: 'DryFam', wealth: 50, armies: 2, resources: ['Grain'] })
+  }, [{ family: 'Dry', action: 'Mobilize', target: 'Self' }]);
+  assert.equal(dry.newState.Dry.armies, 2);
+  assert.ok(dry.logs.some(line => line.includes('requires Oil access')));
+
+  const laundered = Rules.resolveTurn({
+    Fixer: territory({ family: 'FixerFam', stash: 20, blackBudget: 5 })
+  }, [{ family: 'Fixer', action: 'Launder', target: 'Self' }]);
+  assert.equal(laundered.newState.Fixer.stash, 14);
+  assert.equal(laundered.newState.Fixer.blackBudget, 10);
+
+  const cracked = Rules.resolveTurn({
+    Junta: territory({ family: 'JuntaFam', politicalCapital: 50, fear: 20, happiness: 90, governanceChangeSentiment: 40 })
+  }, [{ family: 'Junta', action: 'Crackdown', target: 'Self' }]);
+  assert.equal(cracked.newState.Junta.politicalCapital, 44);
+  assert.equal(cracked.newState.Junta.fear, 30);
+  assert.equal(cracked.newState.Junta.happiness, 84);
+  assert.equal(cracked.newState.Junta.governanceChangeSentiment, 32);
+});
+
+test('general strike and solidarity give clients collective leverage', () => {
+  const Rules = loadRules();
+  const struck = Rules.resolveTurn({
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, wealth: 200, politicalCapital: 80, socialCapital: 80 }),
+    Clientia: territory({ family: 'Clientia', type: 'Client', clientOf: 'USA', wealth: 50, happiness: 80, independenceSentiment: 20 })
+  }, [{ family: 'Clientia', action: 'GeneralStrike', target: 'Self' }]);
+  assert.equal(struck.newState.USA.wealth, 195);
+  assert.equal(struck.newState.USA.politicalCapital, 77);
+  assert.equal(struck.newState.Clientia.wealth, 45);
+  assert.equal(struck.newState.Clientia.happiness, 74);
+  assert.equal(struck.newState.Clientia.independenceSentiment, 26);
+
+  const headStrike = Rules.resolveTurn({
+    Boss: territory({ family: 'BossFam', type: 'Head', clientOf: null, wealth: 200 })
+  }, [{ family: 'Boss', action: 'GeneralStrike', target: 'Self' }]);
+  assert.ok(headStrike.logs.some(line => line.includes('only client families can strike')));
+
+  const aided = Rules.resolveTurn({
+    Giver: territory({ family: 'GiverFam', type: 'Client', clientOf: 'USA', wealth: 50, independenceSentiment: 10 }),
+    Taker: territory({ family: 'TakerFam', type: 'Client', clientOf: 'EU', wealth: 40, happiness: 70, independenceSentiment: 20 })
+  }, [{ family: 'Giver', action: 'Solidarity', target: 'Taker' }]);
+  assert.equal(aided.newState.Giver.wealth, 44);
+  assert.equal(aided.newState.Giver.independenceSentiment, 13);
+  assert.equal(aided.newState.Taker.happiness, 76);
+  assert.equal(aided.newState.Taker.independenceSentiment, 23);
+});
+
+test('debt service, default crises, and leadership crises fire during cleanup', () => {
+  const Rules = loadRules();
+  const result = Rules.resolveCleanup({
+    Debtor: territory({ family: 'DebtorFam', debt: 24, wealth: 100, happiness: 90, stash: 20 }),
+    Defaulter: territory({ family: 'DefaulterFam', debt: 60, wealth: 100, politicalCapital: 50, socialCapital: 50, happiness: 90, stash: 20 }),
+    Shaky: territory({ family: 'ShakyFam', governanceChangeSentiment: 95, politicalCapital: 50, happiness: 90, stash: 20 })
+  });
+  // Debtor: service floor(24/8)=3, then recovery +3 production (dev 50 -> +2) etc.
+  assert.ok(result.logs.some(line => line.includes('Debtor pays 3 wealth in debt service')));
+  assert.ok(result.logs.some(line => line.includes('Default crisis in Defaulter')));
+  assert.equal(result.newState.Defaulter.debt, 30);
+  assert.ok(result.logs.some(line => line.includes('Leadership crisis in Shaky')));
+  assert.ok(result.newState.Shaky.governanceChangeSentiment <= 70);
+});
+
+test('secret agendas evaluate against final state', () => {
+  const Rules = loadRules();
+  const agendas = readJson('frontend', 'data', 'agendas.json');
+  const rulesSource = readText('frontend', 'rules.js');
+  for (const agenda of agendas) {
+    assert.ok(rulesSource.includes(`case '${agenda.id}':`), `missing evaluator for agenda ${agenda.id}`);
+  }
+
+  const state = {
+    Warlord: territory({ family: 'WarlordFam', armies: 5, blackBudget: 25, fear: 70 }),
+    C1: territory({ family: 'C1F', type: 'Client', clientOf: 'WarlordFam', defiance: 0 }),
+    C2: territory({ family: 'C2F', type: 'Client', clientOf: 'WarlordFam', defiance: 0 }),
+    Ruins: territory({ family: 'Collapsed', type: 'Regional', clientOf: null }),
+    Rubble: territory({ family: 'Anarchy', type: 'Client', clientOf: 'WarlordFam' })
+  };
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'arsenal'), true);
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'shadow_banker'), true);
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'iron_grip'), true);
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'puppetmaster'), true);
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'last_family_standing'), true);
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'merchant_of_chaos'), false);
+  assert.equal(Rules.evaluateAgenda(state, 'WarlordFam', 'beloved_regime'), false);
+  assert.equal(Rules.evaluateAgenda(state, 'C1F', 'puppetmaster'), false);
+  assert.equal(Rules.evaluateAgenda(state, 'NoSuchFam', 'arsenal'), false);
+});
+
 test('BGA module matches the Studio project layout', () => {
   const required = [
     'bga/dbmodel.sql',
@@ -1649,7 +1747,7 @@ test('BGA module is self-contained (no reads outside the game folder)', () => {
 
 test('BGA embedded material matches the frontend data fixtures', () => {
   const crypto = require('node:crypto');
-  const sources = ['territories.json', 'crisis.json', 'playercards.json', 'setups.json', 'balance.json'];
+  const sources = ['territories.json', 'crisis.json', 'playercards.json', 'setups.json', 'balance.json', 'agendas.json'];
   const joined = sources.map(name => readText('frontend', 'data', name)).join('\n');
   const expected = crypto.createHash('sha256').update(joined).digest('hex');
   const material = readText('bga', 'material.inc.php');
@@ -1657,7 +1755,7 @@ test('BGA embedded material matches the frontend data fixtures', () => {
   assert.ok(match, 'material.inc.php is missing its source-checksum header');
   assert.equal(match[1], expected,
     'bga/material.inc.php is stale — regenerate with: node tools/generate-bga-material.js');
-  for (const marker of ['territoryMaterial', 'crisisMaterial', 'playerCardMaterial', 'setupMaterial', 'balanceMaterial']) {
+  for (const marker of ['territoryMaterial', 'crisisMaterial', 'playerCardMaterial', 'setupMaterial', 'balanceMaterial', 'agendaMaterial']) {
     assert.ok(material.includes(`$this->${marker}`), `material.inc.php missing ${marker}`);
   }
 });

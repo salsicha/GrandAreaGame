@@ -1,0 +1,12 @@
+[
+  { "id": "arsenal", "title": "Arms Dealer", "desc": "End the game with 4 or more armies." },
+  { "id": "shadow_banker", "title": "Shadow Banker", "desc": "End the game with 20 or more Black Budget." },
+  { "id": "merchant_of_chaos", "title": "Merchant of Chaos", "desc": "At game end, 3 or more territories are defiant." },
+  { "id": "debt_lord", "title": "Debt Lord", "desc": "At game end, 2 or more territories carry 30 or more debt." },
+  { "id": "beloved_regime", "title": "Beloved Regime", "desc": "End the game with 140 or more national happiness." },
+  { "id": "iron_grip", "title": "Iron Grip", "desc": "End the game with 60 or more fear." },
+  { "id": "enlightened_state", "title": "Enlightened State", "desc": "End the game with 100 or more education." },
+  { "id": "industrial_titan", "title": "Industrial Titan", "desc": "End the game with 110 or more development." },
+  { "id": "puppetmaster", "title": "Puppetmaster", "desc": "At game end, 2 or more compliant clients pay tribute to your family." },
+  { "id": "last_family_standing", "title": "Last Family Standing", "desc": "At game end, 2 or more families have been eliminated." }
+]

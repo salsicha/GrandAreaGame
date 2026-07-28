@@ -272,6 +272,9 @@ async function init(){
   try{ gameState.runtime.cardDefs = await loadJSON('data/playercards.json'); } catch(e){ gameState.runtime.cardDefs=[]; }
   // load balance knobs (hand limit etc.)
   try{ gameState.runtime.balance = await loadJSON('data/balance.json'); } catch(e){ gameState.runtime.balance = null; }
+  // load and deal secret agendas (one per family)
+  try{ gameState.runtime.agendaDefs = await loadJSON('data/agendas.json'); } catch(e){ gameState.runtime.agendaDefs = []; }
+  dealAgendas();
   initDeck();
 
   await loadMap();
@@ -380,6 +383,25 @@ function renderCrisisUI(){
   if(!el.querySelector('.meta')) el.appendChild(meta);
 }
 
+// ------------------ Secret agendas ------------------
+function dealAgendas(){
+  gameState.runtime.agendas = {};
+  const defs = gameState.runtime.agendaDefs || [];
+  if(!defs.length) return;
+  const ids = defs.map(a=>a.id);
+  for(let i = ids.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  territoryKeys().forEach((k, index)=>{
+    gameState.runtime.agendas[k] = ids[index % ids.length];
+  });
+}
+
+function agendaDefById(id){
+  return (gameState.runtime.agendaDefs || []).find(a=>a.id === id) || null;
+}
+
 // ------------------ Player Cards (Briefcase) ------------------
 function initDeck(){
   gameState.runtime.hands = {};
@@ -453,6 +475,26 @@ function renderBriefcase(){
   title.textContent = `The Briefcase (${viewer || 'None'})`;
   container.appendChild(title);
 
+  // Secret agenda: visible only to the viewing family
+  const agendaId = viewer && gameState.runtime.agendas && gameState.runtime.agendas[viewer];
+  if(agendaId){
+    const def = agendaDefById(agendaId);
+    if(def){
+      const met = window.Rules && window.Rules.evaluateAgenda
+        ? window.Rules.evaluateAgenda(state, state[viewer] ? state[viewer].family : viewer, agendaId)
+        : false;
+      const agendaEl = document.createElement('div');
+      agendaEl.className = 'agenda';
+      const agendaTitle = document.createElement('strong');
+      agendaTitle.textContent = `Secret agenda: ${def.title}`;
+      const agendaDesc = document.createElement('small');
+      agendaDesc.textContent = `${def.desc} (${met ? 'currently met' : 'not yet met'})`;
+      agendaEl.appendChild(agendaTitle);
+      agendaEl.appendChild(agendaDesc);
+      container.appendChild(agendaEl);
+    }
+  }
+
   if(!viewer || !gameState.runtime.hands || !gameState.runtime.hands[viewer] || gameState.runtime.hands[viewer].length === 0){
     const empty = document.createElement('div');
     empty.textContent = 'No cards.';
@@ -490,7 +532,7 @@ function renderBriefcase(){
 // ----------------------- Turn manager functions -----------------------
 function idFromKey(key){ return `p_${key.replace(/\W+/g,'_')}` }
 
-const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','CounterIntel','Fortify','MakeExample','Concession','Educate','Develop'];
+const ACTIONS = ['Pass','Skim','Propaganda','Invade','Sanction','Protect','TributeHoliday','ProtectionDeal','ClientRealignment','RegionalRivalry','DebtShakedown','EconomicExploitation','Coup','FalseFlag','CovertInfluence','CounterIntel','Fortify','MakeExample','Concession','Educate','Develop','Mobilize','Launder','Crackdown','GeneralStrike','Solidarity'];
 
 const ACTION_RULES = {
   Pass: { target: 'self', cost: 'None', effect: 'No effect.' },
@@ -513,7 +555,12 @@ const ACTION_RULES = {
   MakeExample: { target: 'ownDefiantClient', cost: '10 Social Capital', effect: 'Reset own client defiance; target happiness -20.' },
   Concession: { target: 'ownDefiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset own client defiance; target happiness +10.' },
   Educate: { target: 'self', cost: '8 wealth', effect: 'Education +10, development +3, political side pressure.' },
-  Develop: { target: 'self', cost: '10 wealth; needs Industry or Technology', effect: 'Development +10, happiness +3, net wealth -5.' }
+  Develop: { target: 'self', cost: '10 wealth; needs Industry or Technology', effect: 'Development +10, happiness +3, net wealth -5.' },
+  Mobilize: { target: 'self', cost: '10 wealth; needs Oil', effect: 'Raise a new army (+1 army, +1 fear).' },
+  Launder: { target: 'self', cost: '6 stash', effect: 'Convert stash into 5 Black Budget.' },
+  Crackdown: { target: 'self', cost: '6 Political Capital', effect: 'Fear +10, happiness -6, governance pressure -8.' },
+  GeneralStrike: { target: 'self', cost: '5 wealth, 6 happiness', effect: 'Client only: overlord loses 5 wealth and 3 Political Capital; independence +6.' },
+  Solidarity: { target: 'otherClient', cost: '6 wealth', effect: 'Client only: another client gains 6 happiness; both gain 3 independence.' }
 };
 
 function legalActionsFor(family){
@@ -542,7 +589,19 @@ function isActionLegal(family, action){
   if(action === 'MakeExample') return (data.socialCapital||0) >= 10;
   if(action === 'Concession') return (data.wealth||0) >= 10 && (data.politicalCapital||0) >= 5;
   if(action === 'Educate') return (data.wealth||0) >= 8;
+  if(action === 'Mobilize') return (data.wealth||0) >= 10 && hasOilAccess(family);
+  if(action === 'Launder') return (data.stash||0) >= 6;
+  if(action === 'Crackdown') return (data.politicalCapital||0) >= 6;
+  if(action === 'GeneralStrike') return data.type === 'Client' && (data.wealth||0) >= 5;
+  if(action === 'Solidarity') return data.type === 'Client' && (data.wealth||0) >= 6;
   return true;
+}
+
+function hasOilAccess(family){
+  if(window.Rules && window.Rules.availableResourcesFor){
+    return window.Rules.availableResourcesFor(family, state).has('Oil');
+  }
+  return (state[family] && (state[family].resources || []).includes('Oil')) || false;
 }
 
 function hasDevelopmentResource(family){
@@ -560,6 +619,7 @@ function targetKeysForAction(family, action){
   if(rule.target === 'self') return ['Self'];
   if(rule.target === 'other') return all.filter(k=>k !== family);
   if(rule.target === 'rivalClient') return all.filter(k=>k !== family && state[k].type === 'Client' && state[k].clientOf !== ownFamily);
+  if(rule.target === 'otherClient') return all.filter(k=>k !== family && state[k].type === 'Client');
   if(rule.target === 'controlledClient') return all.filter(k=>state[k].type === 'Client' && state[k].clientOf === ownFamily);
   if(rule.target === 'regionalOther') return all.filter(k=>k !== family && state[k].type === 'Regional');
   if(rule.target === 'ownDefiantClient') return all.filter(k=>state[k].type === 'Client' && state[k].clientOf === ownFamily && (state[k].defiance||0) > 0);

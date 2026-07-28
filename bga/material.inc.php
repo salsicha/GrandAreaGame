@@ -6,7 +6,7 @@
  * self-contained. Regenerate after changing any source JSON with:
  *   node tools/generate-bga-material.js
  *
- * source-checksum: b5be4fb73a494414341cf27adbd9e374b6e267e5428eb4ebb51665d829531e19
+ * source-checksum: 73b943a03876c1dad63f28aed431fc4c32002ce53bcdb4960848c6dcacc66bf3
  */
 
 require_once 'modules/php/constants.inc.php';
@@ -998,6 +998,59 @@ $this->balanceMaterial = array(
         'minimumHappiness' => 120,
         'minimumDevelopment' => 70,
         'minimumIndependenceSentiment' => 60
+    )
+);
+
+$this->agendaMaterial = array(
+    array(
+        'id' => 'arsenal',
+        'title' => 'Arms Dealer',
+        'desc' => 'End the game with 4 or more armies.'
+    ),
+    array(
+        'id' => 'shadow_banker',
+        'title' => 'Shadow Banker',
+        'desc' => 'End the game with 20 or more Black Budget.'
+    ),
+    array(
+        'id' => 'merchant_of_chaos',
+        'title' => 'Merchant of Chaos',
+        'desc' => 'At game end, 3 or more territories are defiant.'
+    ),
+    array(
+        'id' => 'debt_lord',
+        'title' => 'Debt Lord',
+        'desc' => 'At game end, 2 or more territories carry 30 or more debt.'
+    ),
+    array(
+        'id' => 'beloved_regime',
+        'title' => 'Beloved Regime',
+        'desc' => 'End the game with 140 or more national happiness.'
+    ),
+    array(
+        'id' => 'iron_grip',
+        'title' => 'Iron Grip',
+        'desc' => 'End the game with 60 or more fear.'
+    ),
+    array(
+        'id' => 'enlightened_state',
+        'title' => 'Enlightened State',
+        'desc' => 'End the game with 100 or more education.'
+    ),
+    array(
+        'id' => 'industrial_titan',
+        'title' => 'Industrial Titan',
+        'desc' => 'End the game with 110 or more development.'
+    ),
+    array(
+        'id' => 'puppetmaster',
+        'title' => 'Puppetmaster',
+        'desc' => 'At game end, 2 or more compliant clients pay tribute to your family.'
+    ),
+    array(
+        'id' => 'last_family_standing',
+        'title' => 'Last Family Standing',
+        'desc' => 'At game end, 2 or more families have been eliminated.'
     )
 );
 

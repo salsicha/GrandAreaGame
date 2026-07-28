@@ -22,7 +22,12 @@ const ACTION_RULES = {
   MakeExample: { target: 'ownDefiantClient', cost: '10 Social Capital', effect: 'Reset own defiant client; target happiness -20.', tags: ['client-management', 'coercion'] },
   Concession: { target: 'ownDefiantClient', cost: '10 wealth, 5 Political Capital', effect: 'Reset own defiant client; target happiness +10.', tags: ['client-management', 'happiness'] },
   Educate: { target: 'self', cost: '8 wealth', effect: 'Education +10, development +3, political side pressure.', tags: ['education', 'development'] },
-  Develop: { target: 'self', cost: '10 wealth; needs Industry or Technology', effect: 'Development +10, happiness +3, net wealth -5.', tags: ['development', 'economy'] }
+  Develop: { target: 'self', cost: '10 wealth; needs Industry or Technology', effect: 'Development +10, happiness +3, net wealth -5.', tags: ['development', 'economy'] },
+  Mobilize: { target: 'self', cost: '10 wealth; needs Oil', effect: 'Raise a new army (+1 army, +1 fear).', tags: ['military'] },
+  Launder: { target: 'self', cost: '6 stash', effect: 'Convert stash into 5 Black Budget.', tags: ['covert', 'economy'] },
+  Crackdown: { target: 'self', cost: '6 Political Capital', effect: 'Fear +10, happiness -6, governance pressure -8.', tags: ['coercion', 'domestic'] },
+  GeneralStrike: { target: 'self', cost: '5 wealth, 6 happiness', effect: 'Client only: overlord loses 5 wealth and 3 Political Capital; own independence +6.', tags: ['defiance', 'client'] },
+  Solidarity: { target: 'otherClient', cost: '6 wealth', effect: 'Client only: another client gains 6 happiness; both gain 3 independence.', tags: ['client', 'happiness'] }
 };
 
 const ACTIONS = Object.keys(ACTION_RULES);
@@ -105,6 +110,14 @@ function isActionLegal(rules, state, actor, action) {
       const resources = rules.availableResourcesFor(actor, state.territories);
       return resources.has('Industry') || resources.has('Technology');
     }
+    case 'Mobilize': {
+      if ((data.wealth || 0) < 10) return false;
+      return rules.availableResourcesFor(actor, state.territories).has('Oil');
+    }
+    case 'Launder': return (data.stash || 0) >= 6;
+    case 'Crackdown': return (data.politicalCapital || 0) >= 6;
+    case 'GeneralStrike': return data.type === 'Client' && (data.wealth || 0) >= 5;
+    case 'Solidarity': return data.type === 'Client' && (data.wealth || 0) >= 6;
     default: return false;
   }
 }
@@ -141,6 +154,7 @@ function targetKeysForAction(state, actor, action) {
     });
   }
   if (rule.target === 'regionalOther') return others.filter(key => state.territories[key].type === 'Regional');
+  if (rule.target === 'otherClient') return others.filter(key => state.territories[key].type === 'Client');
   return ['Self'];
 }
 

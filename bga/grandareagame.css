@@ -34,6 +34,8 @@
 #grandarea_selected td:last-child{text-align:right}
 
 /* Hand */
+.grandarea-agenda{border:1px dashed #b45309;border-radius:6px;padding:6px 8px;margin:6px 0;background:#fffbeb}
+.grandarea-agenda small{display:block;color:#92400e;margin-top:2px}
 .grandarea-card{border:1px solid #dfe6e9;border-radius:6px;padding:6px 8px;margin:6px 0;background:#fdfefe}
 .grandarea-card strong{display:block;font-size:13px}
 .grandarea-card small{display:block;color:#57606f;margin:2px 0 6px}

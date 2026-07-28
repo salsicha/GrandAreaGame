@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Five new actions and three new mechanics:
+  - `Mobilize` (10 wealth + Oil access: +1 army, +1 fear) and `Launder` (6 stash into 5 Black Budget) complete the military and covert economies — both were wasting resources with no faucet.
+  - `Crackdown` (6 Political Capital: +10 fear, -6 happiness, -8 governance pressure) makes the repression trade-off an explicit choice.
+  - `GeneralStrike` and `Solidarity` (Client-only) give clients collective leverage before the defiance flip: strikes bleed the overlord's wealth and Political Capital, solidarity aid builds the client coalition.
+  - Debt has teeth: cleanup debt service (`floor(debt/8)` wealth) and default crises at 50+ debt (-5 Political/Social Capital, debt halves) turn DebtShakedown and debt cards into slow poison.
+  - Leadership crises: governance-change sentiment at 90+ now boils over on its own (-6 Political Capital, vents 30 sentiment) instead of only feeding coup odds.
+  - Secret agendas: each player draws one hidden end-state objective (10-card deck in `frontend/data/agendas.json`) worth a 150-point bonus at final scoring, revealed to all in the end-game summary. Dealt and displayed in the prototype briefcase and the BGA hand panel (own agenda only; `player_state.agenda_id`).
+  - All implemented in both engines (20-scenario cross-engine parity, including an agenda-evaluation sweep), the prototype, the playtest adapter, and the BGA server/client/schema; four new test groups (94 total passing); five-seed balance sweep confirms the new pressures do not regress attrition.
 - Narrative Battle is now a real phase — the fourth depth lever. After the reveal, each family may make one narrative play for 4 Social Capital: Smear a rival (−3 Political Capital now, −8 effective framing on their revealed action: uglier backlash, dirtier war) or Whitewash anyone including yourself (+2 Social Capital, +8 effective framing: sanitized coverage). Plays stack, are public, and effective framing clamps to 0–50. On BGA it runs as a proper multiactive phase between reveal and resolution (smear/whitewash the selected territory, or pass); the browser prototype collects spins alongside submissions. Implemented in both engines (16-scenario cross-engine parity), the frontend turn manager, and the BGA state machine, server, and client; documented in RULES.md ("Narrative Battle").
 - Depth pass — counterplay and planning for the secret-action phase:
   - New defensive stances: `CounterIntel` (4 Black Budget; foils coups and covert influence against you for the round, exposing the attacker for 8 Social Capital and granting +5 Political Capital per foiled op) and `Fortify` (6 wealth; invasions are blunted — damage halved, no defiance bump, no invader rally). Stances register before any attack resolves regardless of turn order, are one-round only, and are wasted if nobody attacks — bluffing is the point.

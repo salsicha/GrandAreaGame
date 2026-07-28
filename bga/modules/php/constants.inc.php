@@ -92,6 +92,40 @@ if (!function_exists('grandarea_narrative')) {
     }
 }
 
+if (!function_exists('grandarea_debt_pressure')) {
+    /**
+     * Cleanup debt-service tuning. Must stay in sync with DEBT_PRESSURE in
+     * frontend/rules.js (the reference engine).
+     */
+    function grandarea_debt_pressure()
+    {
+        return array(
+            'serviceDivisor' => 8,
+            'defaultThreshold' => 50,
+            'defaultCapitalPenalty' => 5
+        );
+    }
+}
+
+if (!function_exists('grandarea_legitimacy_crisis')) {
+    /**
+     * Leadership-crisis tuning. Must stay in sync with LEGITIMACY_CRISIS in
+     * frontend/rules.js (the reference engine).
+     */
+    function grandarea_legitimacy_crisis()
+    {
+        return array(
+            'threshold' => 90,
+            'politicalPenalty' => 6,
+            'sentimentRelief' => 30
+        );
+    }
+}
+
+if (!defined('GRANDAREA_AGENDA_BONUS_SCORE')) {
+    define('GRANDAREA_AGENDA_BONUS_SCORE', 150);
+}
+
 if (!defined('GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR')) {
     define('GRANDAREA_UPRISING_HAPPINESS_SAFE_FLOOR', 50);
 }
@@ -121,6 +155,11 @@ if (!function_exists('grandarea_allowed_actions')) {
             'CovertInfluence',
             'CounterIntel',
             'Fortify',
+            'Mobilize',
+            'Launder',
+            'Crackdown',
+            'GeneralStrike',
+            'Solidarity',
             'MakeExample',
             'Concession',
             'Educate',

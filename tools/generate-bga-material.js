@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
-const SOURCES = ['territories.json', 'crisis.json', 'playercards.json', 'setups.json', 'balance.json'];
+const SOURCES = ['territories.json', 'crisis.json', 'playercards.json', 'setups.json', 'balance.json', 'agendas.json'];
 
 function readSource(name) {
   return fs.readFileSync(path.join(repoRoot, 'frontend', 'data', name), 'utf8');
@@ -41,6 +41,7 @@ const crisis = JSON.parse(raw['crisis.json']);
 const playercards = JSON.parse(raw['playercards.json']);
 const setups = JSON.parse(raw['setups.json']);
 const balance = JSON.parse(raw['balance.json']);
+const agendas = JSON.parse(raw['agendas.json']);
 
 const out = [];
 out.push('<?php');
@@ -65,6 +66,8 @@ out.push('');
 out.push('$this->setupMaterial = ' + phpValue(setups, 0) + ';');
 out.push('');
 out.push('$this->balanceMaterial = ' + phpValue(balance, 0) + ';');
+out.push('');
+out.push('$this->agendaMaterial = ' + phpValue(agendas, 0) + ';');
 out.push('');
 out.push('$this->roundPhases = grandarea_round_phases();');
 out.push('$this->allowedActions = grandarea_allowed_actions();');

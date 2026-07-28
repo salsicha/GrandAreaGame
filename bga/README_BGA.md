@@ -24,6 +24,7 @@ This folder is a complete Board Game Arena Studio project laid out in BGA's requ
 - `secret_submissions.commit_hash` is public proof that a player committed.
 - `secret_submissions.reveal_payload` is hidden until reveal succeeds; rows are deleted after resolution.
 - `player_state.hand_json` stores each player's private hand; `getAllDatas()` returns only hand counts for opponents and the full hand for the requesting player.
+- `player_state.agenda_id` stores each player's secret agenda; `getAllDatas()` returns only the requesting player's own agenda, and agendas are revealed to everyone in the `gameEnded` summary with their fulfilled/unfulfilled status and the 150-point bonus applied to surviving players' scores.
 - `game_runtime` stores deck order, discards, the current crisis, the secret salt, and revealed payload audit data.
 - Public notifications never include unrevealed hand contents or unrevealed payloads.
 

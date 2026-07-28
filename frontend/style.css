@@ -111,6 +111,8 @@ button:focus-visible, select:focus-visible, input:focus-visible{outline:2px soli
 .briefcase h3{margin:0 0 8px;font-size:15px}
 .card{border:1px solid #666;padding:8px;margin-bottom:6px;border-radius:6px;background:#111827}
 .card small{display:block;color:#cbd5e1;margin:4px 0}
+.agenda{border:1px dashed #b45309;padding:8px;margin-bottom:6px;border-radius:6px;background:#1c1917}
+.agenda small{display:block;color:#fcd34d;margin:4px 0}
 .dialog{position:fixed;inset:0;background:rgba(15,23,42,.35);display:grid;place-items:center;z-index:100}
 .dialog[hidden]{display:none}
 .dialog-panel{background:#fff;border-radius:8px;padding:16px;max-width:360px;box-shadow:0 20px 40px rgba(0,0,0,.18)}

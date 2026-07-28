@@ -33,7 +33,12 @@ define([
     MakeExample: 'ownDefiantClient',
     Concession: 'ownDefiantClient',
     Educate: 'self',
-    Develop: 'self'
+    Develop: 'self',
+    Mobilize: 'self',
+    Launder: 'self',
+    Crackdown: 'self',
+    GeneralStrike: 'self',
+    Solidarity: 'otherClient'
   };
 
   var STAT_FIELDS = [
@@ -249,7 +254,14 @@ define([
         return;
       }
       this.gamedatas.hand = hand;
-      node.innerHTML = '<strong>' + this.escapeText('Your cards') + '</strong>';
+      node.innerHTML = '';
+      var agenda = this.gamedatas.agenda;
+      if (agenda && agenda.title) {
+        node.innerHTML += '<div class="grandarea-agenda"><strong>'
+          + this.escapeText(_('Secret agenda: ') + agenda.title) + '</strong><small>'
+          + this.escapeText(agenda.desc || '') + '</small></div>';
+      }
+      node.innerHTML += '<strong>' + this.escapeText('Your cards') + '</strong>';
       if (!hand.length) {
         node.innerHTML += '<div class="grandarea-panel-row">' + this.escapeText('No cards in hand.') + '</div>';
         return;
@@ -348,6 +360,11 @@ define([
       if (action === 'MakeExample') return this.num(me, 'socialCapital') >= 10;
       if (action === 'Concession') return this.num(me, 'wealth') >= 10 && this.num(me, 'politicalCapital') >= 5;
       if (action === 'Educate') return this.num(me, 'wealth') >= 8;
+      if (action === 'Mobilize') return this.num(me, 'wealth') >= 10;
+      if (action === 'Launder') return this.num(me, 'stash') >= 6;
+      if (action === 'Crackdown') return this.num(me, 'politicalCapital') >= 6;
+      if (action === 'GeneralStrike') return me.type === 'Client' && this.num(me, 'wealth') >= 5;
+      if (action === 'Solidarity') return me.type === 'Client' && this.num(me, 'wealth') >= 6;
       return true;
     },
 
@@ -383,6 +400,9 @@ define([
           continue;
         }
         if (mode === 'regionalOther' && data.type !== 'Regional') {
+          continue;
+        }
+        if (mode === 'otherClient' && data.type !== 'Client') {
           continue;
         }
         out.push(key);
@@ -793,8 +813,12 @@ define([
       var summary = notif.args.summary || [];
       for (var i = 0; i < summary.length; i++) {
         var entry = summary[i];
+        var agendaText = '';
+        if (entry.agenda && entry.agenda.title) {
+          agendaText = '; agenda "' + entry.agenda.title + '" ' + (entry.agenda_met ? 'fulfilled' : 'unfulfilled');
+        }
         this.logLine((entry.family || '?') + ': ' + (entry.won ? 'objective met' : (entry.surviving ? 'survived' : 'eliminated'))
-          + ' (wealth ' + entry.wealth + ')');
+          + ' (wealth ' + entry.wealth + agendaText + ')');
       }
     }
   });

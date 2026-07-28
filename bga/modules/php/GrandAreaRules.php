@@ -14,14 +14,21 @@ class GrandAreaRules
 
     private static $actionPriority = array(
         'Pass' => 0,
+        'CounterIntel' => 1,
+        'Fortify' => 1,
         'Concession' => 1,
         'TributeHoliday' => 1,
         'Protect' => 2,
         'ProtectionDeal' => 2,
+        'Solidarity' => 2,
         'Educate' => 3,
         'Develop' => 3,
+        'Mobilize' => 3,
         'Skim' => 4,
         'Propaganda' => 4,
+        'Launder' => 4,
+        'Crackdown' => 4,
+        'GeneralStrike' => 5,
         'DebtShakedown' => 5,
         'EconomicExploitation' => 5,
         'Sanction' => 6,
@@ -933,6 +940,89 @@ class GrandAreaRules
                 $A['politicalCapital'] = self::num($A, 'politicalCapital') + 5;
                 $logs[] = $actorKey . ' used CovertInfluence on ' . $targetKey . ' (defiance +1, politicalCapital +5)';
                 break;
+            case 'Mobilize':
+                if (self::num($A, 'wealth') < 10) {
+                    $logs[] = $actorKey . ' failed Mobilize (insufficient wealth)';
+                    break;
+                }
+                if (!in_array('Oil', self::availableResourcesFor($actorKey, $state), true)) {
+                    $logs[] = $actorKey . ' failed Mobilize (requires Oil access)';
+                    break;
+                }
+                $A['wealth'] = max(0, self::num($A, 'wealth') - 10);
+                $A['armies'] = self::num($A, 'armies') + 1;
+                $A['fear'] = min(100, max(0, self::num($A, 'fear') + 1));
+                $logs[] = $actorKey . ' mobilizes new forces (+1 army, +1 fear)';
+                break;
+            case 'Launder':
+                if (self::num($A, 'stash') < 6) {
+                    $logs[] = $actorKey . ' failed Launder (insufficient stash)';
+                    break;
+                }
+                $A['stash'] = max(0, self::num($A, 'stash') - 6);
+                $A['blackBudget'] = self::num($A, 'blackBudget') + 5;
+                $logs[] = $actorKey . ' launders stash into the Black Budget (-6 stash, +5 Black Budget)';
+                break;
+            case 'Crackdown':
+                if (self::num($A, 'politicalCapital') < 6) {
+                    $logs[] = $actorKey . ' failed Crackdown (insufficient Political Capital)';
+                    break;
+                }
+                $A['politicalCapital'] = max(0, self::num($A, 'politicalCapital') - 6);
+                $A['fear'] = min(100, max(0, self::num($A, 'fear') + 10));
+                $A['happiness'] = min(200, max(0, self::num($A, 'happiness') - 6));
+                $A['governanceChangeSentiment'] = min(100, max(0, self::num($A, 'governanceChangeSentiment') - 8));
+                $logs[] = $actorKey . ' cracks down on dissent (+10 fear, -6 happiness, -8 governance pressure)';
+                break;
+            case 'GeneralStrike':
+                if (self::str($A, 'type') !== 'Client') {
+                    $logs[] = $actorKey . ' failed GeneralStrike (only client families can strike)';
+                    break;
+                }
+                if (self::num($A, 'wealth') < 5) {
+                    $logs[] = $actorKey . ' failed GeneralStrike (insufficient wealth)';
+                    break;
+                }
+                $overlordKey = self::findOverlordKeyByName($state, self::str($A, 'clientOf'));
+                if ($overlordKey === null || self::isEliminated($state[$overlordKey])) {
+                    $logs[] = $actorKey . ' failed GeneralStrike (no living overlord to strike against)';
+                    break;
+                }
+                $A['wealth'] = max(0, self::num($A, 'wealth') - 5);
+                $A['happiness'] = min(200, max(0, self::num($A, 'happiness') - 6));
+                $A['independenceSentiment'] = min(100, max(0, self::num($A, 'independenceSentiment') + 6));
+                $state[$overlordKey]['wealth'] = max(0, self::num($state[$overlordKey], 'wealth') - 5);
+                $state[$overlordKey]['politicalCapital'] = max(0, self::num($state[$overlordKey], 'politicalCapital') - 3);
+                $logs[] = $actorKey . ' calls a general strike against ' . self::str($A, 'clientOf')
+                    . ' (overlord -5 wealth, -3 Political Capital; independence +6)';
+                break;
+            case 'Solidarity':
+                if (!$hasT) {
+                    $logs[] = $actorKey . ' attempted Solidarity with missing target ' . $targetKey;
+                    break;
+                }
+                if ($targetKey === $actorKey) {
+                    $logs[] = $actorKey . ' failed Solidarity (cannot target self)';
+                    break;
+                }
+                if (self::str($A, 'type') !== 'Client') {
+                    $logs[] = $actorKey . ' failed Solidarity (only client families can offer solidarity)';
+                    break;
+                }
+                if (self::str($T, 'type') !== 'Client') {
+                    $logs[] = $actorKey . ' failed Solidarity (' . $targetKey . ' is not a client)';
+                    break;
+                }
+                if (self::num($A, 'wealth') < 6) {
+                    $logs[] = $actorKey . ' failed Solidarity (insufficient wealth)';
+                    break;
+                }
+                $A['wealth'] = max(0, self::num($A, 'wealth') - 6);
+                $T['happiness'] = min(200, max(0, self::num($T, 'happiness') + 6));
+                $A['independenceSentiment'] = min(100, max(0, self::num($A, 'independenceSentiment') + 3));
+                $T['independenceSentiment'] = min(100, max(0, self::num($T, 'independenceSentiment') + 3));
+                $logs[] = $actorKey . ' sends solidarity aid to ' . $targetKey . ' (+6 happiness, both +3 independence)';
+                break;
             case 'CounterIntel':
                 if (self::truthyField($A, 'counterIntelActive')) {
                     $logs[] = $actorKey . ' runs counterintelligence sweeps this round';
@@ -1520,7 +1610,8 @@ class GrandAreaRules
 
         $resourceResult = self::resolveResourcePressure($newState);
         $sentimentResult = self::resolveSentiment($resourceResult['newState']);
-        $recoveryResult = self::applyCleanupRecovery($sentimentResult['newState']);
+        $debtResult = self::applyDebtAndLegitimacyPressure($sentimentResult['newState']);
+        $recoveryResult = self::applyCleanupRecovery($debtResult['newState']);
         $comebackResult = self::applyComebackPressure($recoveryResult['newState']);
         $majorityResult = self::updateDefianceMajorityCounters($comebackResult['newState']);
         $objectiveResult = self::evaluateObjectives($majorityResult['newState']);
@@ -1531,12 +1622,134 @@ class GrandAreaRules
                 $logs,
                 $resourceResult['logs'],
                 $sentimentResult['logs'],
+                $debtResult['logs'],
                 $recoveryResult['logs'],
                 $comebackResult['logs'],
                 $majorityResult['logs'],
                 $objectiveResult['logs']
             )
         );
+    }
+
+    /**
+     * Debt service, default crises, and leadership crises. Mirrors
+     * applyDebtAndLegitimacyPressure in frontend/rules.js.
+     */
+    public static function applyDebtAndLegitimacyPressure($state)
+    {
+        $logs = array();
+        $newState = self::cloneTerritories($state);
+        $debtTuning = grandarea_debt_pressure();
+        $crisisTuning = grandarea_legitimacy_crisis();
+
+        $keys = array_keys($newState);
+        sort($keys, SORT_STRING);
+        foreach ($keys as $key) {
+            $data =& $newState[$key];
+            if (self::isEliminated($data)) {
+                unset($data);
+                continue;
+            }
+
+            $service = intval(floor(self::num($data, 'debt') / $debtTuning['serviceDivisor']));
+            if ($service > 0) {
+                $data['wealth'] = max(0, self::num($data, 'wealth') - $service);
+                $logs[] = $key . ' pays ' . $service . ' wealth in debt service';
+            }
+
+            if (self::num($data, 'debt') >= $debtTuning['defaultThreshold']) {
+                $data['politicalCapital'] = max(0, self::num($data, 'politicalCapital') - $debtTuning['defaultCapitalPenalty']);
+                $data['socialCapital'] = max(0, self::num($data, 'socialCapital') - $debtTuning['defaultCapitalPenalty']);
+                $data['debt'] = intval(floor(self::num($data, 'debt') / 2));
+                $logs[] = 'Default crisis in ' . $key . ': -' . $debtTuning['defaultCapitalPenalty']
+                    . ' Political and Social Capital, debt restructured to ' . $data['debt'];
+            }
+
+            if (self::num($data, 'governanceChangeSentiment') >= $crisisTuning['threshold']) {
+                $data['politicalCapital'] = max(0, self::num($data, 'politicalCapital') - $crisisTuning['politicalPenalty']);
+                $data['governanceChangeSentiment'] = min(100, max(0, self::num($data, 'governanceChangeSentiment') - $crisisTuning['sentimentRelief']));
+                $logs[] = 'Leadership crisis in ' . $key . ': -' . $crisisTuning['politicalPenalty']
+                    . ' Political Capital, governance pressure vents to ' . $data['governanceChangeSentiment'];
+            }
+            unset($data);
+        }
+
+        return array('newState' => $newState, 'logs' => $logs);
+    }
+
+    /**
+     * Secret agenda checks. Mirrors evaluateAgenda in frontend/rules.js.
+     */
+    public static function evaluateAgenda($state, $family, $agendaId)
+    {
+        $actorKey = null;
+        if (isset($state[$family]) && !self::isEliminated($state[$family])) {
+            $actorKey = $family;
+        } else {
+            $keys = array_keys($state);
+            sort($keys, SORT_STRING);
+            foreach ($keys as $key) {
+                if (self::str($state[$key], 'family') === $family && !self::isEliminated($state[$key])) {
+                    $actorKey = $key;
+                    break;
+                }
+            }
+        }
+        $actor = $actorKey !== null ? $state[$actorKey] : null;
+
+        $living = array();
+        $eliminatedCount = 0;
+        foreach ($state as $key => $data) {
+            if (self::isEliminated($data)) {
+                $eliminatedCount++;
+            } else {
+                $living[$key] = $data;
+            }
+        }
+
+        switch ($agendaId) {
+            case 'arsenal':
+                return $actor !== null && self::num($actor, 'armies') >= 4;
+            case 'shadow_banker':
+                return $actor !== null && self::num($actor, 'blackBudget') >= 20;
+            case 'merchant_of_chaos':
+                $count = 0;
+                foreach ($living as $data) {
+                    if (self::num($data, 'defiance') > 0) {
+                        $count++;
+                    }
+                }
+                return $count >= 3;
+            case 'debt_lord':
+                $count = 0;
+                foreach ($living as $data) {
+                    if (self::num($data, 'debt') >= 30) {
+                        $count++;
+                    }
+                }
+                return $count >= 2;
+            case 'beloved_regime':
+                return $actor !== null && self::num($actor, 'happiness') >= 140;
+            case 'iron_grip':
+                return $actor !== null && self::num($actor, 'fear') >= 60;
+            case 'enlightened_state':
+                return $actor !== null && self::num($actor, 'education') >= 100;
+            case 'industrial_titan':
+                return $actor !== null && self::num($actor, 'development') >= 110;
+            case 'puppetmaster':
+                $count = 0;
+                foreach ($living as $data) {
+                    if (self::str($data, 'type') === 'Client' && self::str($data, 'clientOf') === $family
+                        && self::num($data, 'defiance') === 0) {
+                        $count++;
+                    }
+                }
+                return $count >= 2;
+            case 'last_family_standing':
+                return $eliminatedCount >= 2;
+            default:
+                return false;
+        }
     }
 
     // ------------------------------------------------------------------

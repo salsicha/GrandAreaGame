@@ -15,7 +15,7 @@ Each territory record separates identity, role, and dependency:
 - `blackBudget`: covert operating funds used for deniable actions.
 - `education`: long-term human capacity. High education can increase independence or governance-change pressure depending on happiness and role.
 - `development`: long-term productive capacity used by client good-example victory and reduced by resource shortages.
-- `debt`: externally imposed obligations. Debt shakedowns raise this track and convert target wealth into actor wealth.
+- `debt`: externally imposed obligations. Debt shakedowns raise this track and convert target wealth into actor wealth. Debt bleeds during cleanup: territories pay `floor(debt / 8)` wealth in debt service, and debt of `50` or more triggers a default crisis (`-5` Political and Social Capital, debt halves).
 - `tributeHoliday`: tribute phases remaining where a client skips payment by negotiated agreement.
 - `protectionDeal`: cleanup rounds remaining on a formal protection arrangement.
 - `realignmentPressure`: pressure that makes a client eligible to switch patrons.
@@ -162,7 +162,10 @@ Sentiment tracks political pressure inside a territory.
 
 ## Cleanup Recovery And Collapse
 
-Cleanup resolves in a fixed order: capital-zero checks, protection and pressure decay, uprising checks, resource pressure, sentiment, recovery, comeback pressure, the defiant-majority counter update, then objectives.
+Cleanup resolves in a fixed order: capital-zero checks, protection and pressure decay, uprising checks, resource pressure, sentiment, debt service and legitimacy crises, recovery, comeback pressure, the defiant-majority counter update, then objectives.
+
+- Debt service: every indebted territory pays `floor(debt / 8)` wealth; at `50` or more debt a default crisis costs `5` Political and `5` Social Capital and restructures debt to half.
+- Leadership crisis: governance-change sentiment at `90` or higher costs `6` Political Capital and vents `30` sentiment — unanswered public pressure now boils over on its own instead of waiting for a coup.
 
 - Capital-zero checks run first: a family whose stash, Political Capital, or Social Capital is `0` at the start of cleanup collapses before any recovery applies. Recovery can slow a slide toward zero but never rescues a seat already at zero.
 - A family that has already achieved its objective can no longer collapse; the game ended for them at the moment of victory.
@@ -190,12 +193,25 @@ Education and development are long-term investments with political side effects.
 Major actions are balanced around cost, target damage, and political side effects.
 
 - Coercive and extractive actions (`Invade`, `Sanction`, `Coup`, `DebtShakedown`, `EconomicExploitation`, `Protect`, `ProtectionDeal`, `ClientRealignment`, `MakeExample`, `Concession`) cannot target the actor's own territory.
+- `Mobilize` costs `10` wealth, requires `Oil` access, and raises a new army (+1 army, +1 fear).
+- `Launder` converts `6` stash into `5` Black Budget, moving visible family loot into deniable funds (and reducing uprising exposure, since uprisings compare happiness against stash).
+- `Crackdown` costs `6` Political Capital and turns coercion inward: +10 fear, -6 happiness, -8 governance-change pressure.
+- `GeneralStrike` (Client only) costs `5` wealth and `6` happiness: the overlord loses `5` wealth and `3` Political Capital, and the striking client gains `6` independence sentiment. Requires a living overlord.
+- `Solidarity` (Client only) sends `6` wealth in aid to another client: the target gains `6` happiness and both clients gain `3` independence sentiment.
 - `Invade` costs wealth and armies, marks the target invaded, damages wealth and happiness, raises fear and governance-change pressure, and increases client defiance. Invading a territory protected by another family costs the invader an extra `5` Political Capital and `5` Social Capital in backlash.
 - `Sanction` costs Political Capital, damages target wealth, happiness, and development, and creates governance-change pressure.
 - `Protect` costs wealth and stash, marks a protected relationship lasting `2` cleanup rounds, increases target happiness, reduces target fear, and can raise defiance if the target is another family's client. Protection expires when the `protectionDeal` counter reaches `0`.
 - `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success. A successful coup transfers family control and resets the territory's defiant-majority counter: the new ruling family starts with a fresh grace period. A failed coup rallies the target around the flag: the target gains `5` Political Capital and `4` fear.
 - `DebtShakedown` costs Political Capital, converts target wealth into actor wealth, raises target debt, lowers happiness, and creates backlash.
 - `EconomicExploitation` costs Social Capital, extracts wealth and stash value, lowers target development and happiness, and creates backlash.
+
+## Secret Agendas
+
+Each player draws one secret agenda at setup (`frontend/data/agendas.json`), hidden until game end.
+
+- Agendas are end-state conditions — for example Arms Dealer (4+ armies), Shadow Banker (20+ Black Budget), Merchant of Chaos (3+ defiant territories), Debt Lord (2+ territories with 30+ debt), Puppetmaster (2+ compliant clients), Beloved Regime, Iron Grip, Enlightened State, Industrial Titan, and Last Family Standing.
+- At game end a fulfilled agenda is worth a `150`-point score bonus, on top of survival wealth or an objective win. Eliminated families collect nothing.
+- Agendas are revealed to everyone in the final summary, so odd-looking mid-game moves get their explanation.
 
 ## Narrative Battle
 

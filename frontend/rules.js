@@ -46,6 +46,20 @@
     whitewashSocialGain: 2
   };
 
+  const DEBT_PRESSURE = {
+    serviceDivisor: 8,
+    defaultThreshold: 50,
+    defaultCapitalPenalty: 5
+  };
+
+  const LEGITIMACY_CRISIS = {
+    threshold: 90,
+    politicalPenalty: 6,
+    sentimentRelief: 30
+  };
+
+  const AGENDA_BONUS_SCORE = 150;
+
   const UPRISING_HAPPINESS_SAFE_FLOOR = 50;
   const HEAD_DEFIANCE_MAJORITY_ROUNDS_TO_LOSE = 2;
 
@@ -61,10 +75,15 @@
     TributeHoliday: 1,
     Protect: 2,
     ProtectionDeal: 2,
+    Solidarity: 2,
     Educate: 3,
     Develop: 3,
+    Mobilize: 3,
     Skim: 4,
     Propaganda: 4,
+    Launder: 4,
+    Crackdown: 4,
+    GeneralStrike: 5,
     DebtShakedown: 5,
     EconomicExploitation: 5,
     Sanction: 6,
@@ -466,6 +485,70 @@
     return { newState, logs };
   }
 
+  function applyDebtAndLegitimacyPressure(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+
+    Object.keys(newState).sort().forEach(key=>{
+      const data = newState[key];
+      if(isEliminated(data)) return;
+
+      // Debt service: carrying debt bleeds wealth every cleanup.
+      const service = Math.floor((data.debt || 0) / DEBT_PRESSURE.serviceDivisor);
+      if(service > 0){
+        data.wealth = clamp((data.wealth || 0) - service, 0);
+        logs.push(`${key} pays ${service} wealth in debt service`);
+      }
+
+      // Default crisis: unsustainable debt breaks the government's standing.
+      if((data.debt || 0) >= DEBT_PRESSURE.defaultThreshold){
+        data.politicalCapital = clamp((data.politicalCapital || 0) - DEBT_PRESSURE.defaultCapitalPenalty, 0);
+        data.socialCapital = clamp((data.socialCapital || 0) - DEBT_PRESSURE.defaultCapitalPenalty, 0);
+        data.debt = Math.floor((data.debt || 0) / 2);
+        logs.push(`Default crisis in ${key}: -${DEBT_PRESSURE.defaultCapitalPenalty} Political and Social Capital, debt restructured to ${data.debt}`);
+      }
+
+      // Leadership crisis: unanswered governance pressure boils over.
+      if((data.governanceChangeSentiment || 0) >= LEGITIMACY_CRISIS.threshold){
+        data.politicalCapital = clamp((data.politicalCapital || 0) - LEGITIMACY_CRISIS.politicalPenalty, 0);
+        data.governanceChangeSentiment = clamp((data.governanceChangeSentiment || 0) - LEGITIMACY_CRISIS.sentimentRelief, 0, 100);
+        logs.push(`Leadership crisis in ${key}: -${LEGITIMACY_CRISIS.politicalPenalty} Political Capital, governance pressure vents to ${data.governanceChangeSentiment}`);
+      }
+    });
+
+    return { newState, logs };
+  }
+
+  function findActorKeyForFamily(state, family){
+    if(state[family] && isTerritoryState(state[family]) && !isEliminated(state[family])) return family;
+    const keys = Object.keys(state).sort();
+    for(const key of keys){
+      const data = state[key];
+      if(isTerritoryState(data) && data.family === family && !isEliminated(data)) return key;
+    }
+    return null;
+  }
+
+  function evaluateAgenda(state, family, agendaId){
+    const actorKey = findActorKeyForFamily(state, family);
+    const actor = actorKey ? state[actorKey] : null;
+    const keys = Object.keys(state).filter(k=>isTerritoryState(state[k]));
+    const living = keys.filter(k=>!isEliminated(state[k]));
+    switch(agendaId){
+      case 'arsenal': return !!actor && (actor.armies||0) >= 4;
+      case 'shadow_banker': return !!actor && (actor.blackBudget||0) >= 20;
+      case 'merchant_of_chaos': return living.filter(k=>(state[k].defiance||0) > 0).length >= 3;
+      case 'debt_lord': return living.filter(k=>(state[k].debt||0) >= 30).length >= 2;
+      case 'beloved_regime': return !!actor && (actor.happiness||0) >= 140;
+      case 'iron_grip': return !!actor && (actor.fear||0) >= 60;
+      case 'enlightened_state': return !!actor && (actor.education||0) >= 100;
+      case 'industrial_titan': return !!actor && (actor.development||0) >= 110;
+      case 'puppetmaster': return living.filter(k=>state[k].type === 'Client' && state[k].clientOf === family && (state[k].defiance||0) === 0).length >= 2;
+      case 'last_family_standing': return keys.filter(k=>isEliminated(state[k])).length >= 2;
+      default: return false;
+    }
+  }
+
   function applyComebackPressure(state){
     const logs = [];
     const newState = cloneTerritories(state);
@@ -676,6 +759,62 @@
         case 'Skim':{
           const amt = 10;
           if(T){ const transferred = Math.min(amt, T.wealth||0); T.wealth = clamp((T.wealth||0) - transferred, 0); A.stash = (A.stash||0) + transferred; T.happiness = clamp((T.happiness||0) - 6, 0); logs.push(`${actor} skimmed ${transferred} from ${target}`); }
+          break;
+        }
+        case 'Mobilize':{
+          const cost = 10;
+          if((A.wealth||0) < cost){ logs.push(`${actor} failed Mobilize (insufficient wealth)`); break; }
+          if(!availableResourcesFor(actor, newState).has('Oil')){ logs.push(`${actor} failed Mobilize (requires Oil access)`); break; }
+          A.wealth = clamp((A.wealth||0) - cost, 0);
+          A.armies = (A.armies||0) + 1;
+          A.fear = clamp((A.fear||0) + 1, 0, 100);
+          logs.push(`${actor} mobilizes new forces (+1 army, +1 fear)`);
+          break;
+        }
+        case 'Launder':{
+          const cost = 6;
+          if((A.stash||0) < cost){ logs.push(`${actor} failed Launder (insufficient stash)`); break; }
+          A.stash = clamp((A.stash||0) - cost, 0);
+          A.blackBudget = (A.blackBudget||0) + 5;
+          logs.push(`${actor} launders stash into the Black Budget (-${cost} stash, +5 Black Budget)`);
+          break;
+        }
+        case 'Crackdown':{
+          const cost = 6;
+          if((A.politicalCapital||0) < cost){ logs.push(`${actor} failed Crackdown (insufficient Political Capital)`); break; }
+          A.politicalCapital = clamp((A.politicalCapital||0) - cost, 0);
+          A.fear = clamp((A.fear||0) + 10, 0, 100);
+          A.happiness = clamp((A.happiness||0) - 6, 0, 200);
+          A.governanceChangeSentiment = clamp((A.governanceChangeSentiment||0) - 8, 0, 100);
+          logs.push(`${actor} cracks down on dissent (+10 fear, -6 happiness, -8 governance pressure)`);
+          break;
+        }
+        case 'GeneralStrike':{
+          if(A.type !== 'Client'){ logs.push(`${actor} failed GeneralStrike (only client families can strike)`); break; }
+          const wealthCost = 5;
+          if((A.wealth||0) < wealthCost){ logs.push(`${actor} failed GeneralStrike (insufficient wealth)`); break; }
+          const overlord = findOverlordTerritory(newState, A);
+          if(!overlord || isEliminated(overlord)){ logs.push(`${actor} failed GeneralStrike (no living overlord to strike against)`); break; }
+          A.wealth = clamp((A.wealth||0) - wealthCost, 0);
+          A.happiness = clamp((A.happiness||0) - 6, 0, 200);
+          A.independenceSentiment = clamp((A.independenceSentiment||0) + 6, 0, 100);
+          overlord.wealth = clamp((overlord.wealth||0) - 5, 0);
+          overlord.politicalCapital = clamp((overlord.politicalCapital||0) - 3, 0);
+          logs.push(`${actor} calls a general strike against ${A.clientOf} (overlord -5 wealth, -3 Political Capital; independence +6)`);
+          break;
+        }
+        case 'Solidarity':{
+          if(!T){ logs.push(`${actor} attempted Solidarity with missing target ${target}`); break; }
+          if(target === actor){ logs.push(`${actor} failed Solidarity (cannot target self)`); break; }
+          if(A.type !== 'Client'){ logs.push(`${actor} failed Solidarity (only client families can offer solidarity)`); break; }
+          if(T.type !== 'Client'){ logs.push(`${actor} failed Solidarity (${target} is not a client)`); break; }
+          const cost = 6;
+          if((A.wealth||0) < cost){ logs.push(`${actor} failed Solidarity (insufficient wealth)`); break; }
+          A.wealth = clamp((A.wealth||0) - cost, 0);
+          T.happiness = clamp((T.happiness||0) + 6, 0, 200);
+          A.independenceSentiment = clamp((A.independenceSentiment||0) + 3, 0, 100);
+          T.independenceSentiment = clamp((T.independenceSentiment||0) + 3, 0, 100);
+          logs.push(`${actor} sends solidarity aid to ${target} (+6 happiness, both +3 independence)`);
           break;
         }
         case 'Propaganda':{
@@ -1078,11 +1217,12 @@
 
     const resourceResult = resolveResourcePressure(newState);
     const sentimentResult = resolveSentiment(resourceResult.newState);
-    const recoveryResult = applyCleanupRecovery(sentimentResult.newState);
+    const debtResult = applyDebtAndLegitimacyPressure(sentimentResult.newState);
+    const recoveryResult = applyCleanupRecovery(debtResult.newState);
     const comebackResult = applyComebackPressure(recoveryResult.newState);
     const majorityResult = updateDefianceMajorityCounters(comebackResult.newState);
     const objectiveResult = evaluateObjectives(majorityResult.newState);
-    return { newState: objectiveResult.newState, logs: logs.concat(resourceResult.logs, sentimentResult.logs, recoveryResult.logs, comebackResult.logs, majorityResult.logs, objectiveResult.logs) };
+    return { newState: objectiveResult.newState, logs: logs.concat(resourceResult.logs, sentimentResult.logs, debtResult.logs, recoveryResult.logs, comebackResult.logs, majorityResult.logs, objectiveResult.logs) };
   }
 
   function resolveTribute(state){
@@ -1298,5 +1438,5 @@
     return { newState, logs };
   }
 
-  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, NARRATIVE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
+  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, NARRATIVE, DEBT_PRESSURE, LEGITIMACY_CRISIS, AGENDA_BONUS_SCORE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, evaluateAgenda, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, applyDebtAndLegitimacyPressure, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
 })();

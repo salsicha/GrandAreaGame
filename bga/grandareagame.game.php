@@ -81,17 +81,21 @@ class GrandAreaGame extends Table
         $this->persistRuntime('secret_salt', $salt);
 
         // Collision-free family assignment in player order, from the setup
-        // fixture for this player count when one exists.
+        // fixture for this player count when one exists. Each player also
+        // draws one secret agenda from the shuffled agenda deck.
         $families = $this->familiesForPlayerCount($territories, count($players));
+        $agendaIds = $this->shuffleIds($this->agendaMaterial, 'setup-agendas:' . $gameId . ':' . $salt);
         $seat = 0;
         foreach ($players as $playerId => $player) {
             $family = $families[$seat % count($families)];
+            $agendaId = count($agendaIds) > 0 ? $agendaIds[$seat % count($agendaIds)] : null;
             $seat++;
-            $sql = "REPLACE INTO player_state (game_id, player_id, family_name, hand_json) VALUES ("
+            $sql = "REPLACE INTO player_state (game_id, player_id, family_name, hand_json, agenda_id) VALUES ("
                 . $gameId . ", "
                 . intval($playerId) . ", "
                 . $this->sqlString($family) . ", "
-                . $this->sqlString('[]') . ")";
+                . $this->sqlString('[]') . ", "
+                . $this->nullableSqlString($agendaId) . ")";
             self::DbQuery($sql);
         }
 
@@ -573,7 +577,7 @@ class GrandAreaGame extends Table
         }
 
         $players = self::getObjectListFromDB(
-            "SELECT player_id, family_name FROM player_state WHERE game_id = " . $gameId
+            "SELECT player_id, family_name, agenda_id FROM player_state WHERE game_id = " . $gameId
         );
         $survivorCount = 0;
         $summary = array();
@@ -597,12 +601,16 @@ class GrandAreaGame extends Table
             if ($surviving) {
                 $survivorCount++;
             }
+            $agendaId = isset($playerRow['agenda_id']) ? $playerRow['agenda_id'] : null;
+            $agendaMet = $agendaId !== null && GrandAreaRules::evaluateAgenda($state, $family, $agendaId);
             $summary[] = array(
                 'player_id' => intval($playerRow['player_id']),
                 'family' => $family,
                 'won' => $won,
                 'surviving' => $surviving,
-                'wealth' => $wealth
+                'wealth' => $wealth,
+                'agenda' => $agendaId !== null ? $this->agendaDefById($agendaId) : null,
+                'agenda_met' => $agendaMet
             );
         }
 
@@ -617,6 +625,10 @@ class GrandAreaGame extends Table
             } elseif ($entry['surviving']) {
                 $score = intval($entry['wealth']);
             }
+            // Secret agenda bonus: only families still in the game collect it.
+            if ($score > 0 && $entry['agenda_met']) {
+                $score += GRANDAREA_AGENDA_BONUS_SCORE;
+            }
             self::DbQuery("UPDATE player SET player_score = " . intval($score)
                 . ", player_score_aux = " . intval($entry['wealth'])
                 . " WHERE player_id = " . intval($entry['player_id']));
@@ -624,6 +636,16 @@ class GrandAreaGame extends Table
 
         self::notifyAllPlayers('gameEnded', '', array('summary' => $summary));
         return true;
+    }
+
+    private function agendaDefById($agendaId)
+    {
+        foreach ($this->agendaMaterial as $agenda) {
+            if (isset($agenda['id']) && $agenda['id'] === $agendaId) {
+                return $agenda;
+            }
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------
@@ -652,12 +674,14 @@ class GrandAreaGame extends Table
         $result['card_defs'] = $this->playerCardMaterial;
         $result['allowed_actions'] = $this->allowedActions;
 
-        // Hidden information: opponents only ever receive hand counts.
+        // Hidden information: opponents only ever receive hand counts, and
+        // each player sees only their own secret agenda.
         $result['families'] = array();
         $result['hand_counts'] = array();
         $result['hand'] = array();
+        $result['agenda'] = null;
         $rows = self::getObjectListFromDB(
-            "SELECT player_id, family_name, hand_json FROM player_state WHERE game_id = " . $gameId
+            "SELECT player_id, family_name, hand_json, agenda_id FROM player_state WHERE game_id = " . $gameId
         );
         foreach ($rows as $row) {
             $playerId = intval($row['player_id']);
@@ -669,6 +693,9 @@ class GrandAreaGame extends Table
             $result['hand_counts'][$playerId] = count($hand);
             if ($playerId === $currentPlayerId) {
                 $result['hand'] = $hand;
+                if (isset($row['agenda_id']) && $row['agenda_id'] !== null) {
+                    $result['agenda'] = $this->agendaDefById($row['agenda_id']);
+                }
             }
         }
 

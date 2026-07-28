@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS player_state (
   player_id INT NOT NULL,
   family_name VARCHAR(64),
   hand_json TEXT NOT NULL,
+  agenda_id VARCHAR(64) NULL,
   PRIMARY KEY(game_id, player_id)
 );
 
