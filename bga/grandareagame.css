@@ -17,6 +17,7 @@
 #grandarea_map .overlay-regional{fill:#55efc4}
 #grandarea_map .overlay-client{fill:#ffeaa7}
 #grandarea_map .territory.defiant{fill:#ff7675}
+#grandarea_map .territory.failed-state{fill:#636e72;stroke:#d63031;stroke-width:2;stroke-dasharray:4 2}
 #grandarea_map .territory.eliminated{fill:#b2bec3;opacity:.65}
 #grandarea_map .territory.invaded{stroke:#d63031;stroke-width:2.5}
 #grandarea_map .territory.sanctioned{stroke:#6c5ce7;stroke-width:2.5}

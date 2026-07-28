@@ -184,6 +184,12 @@ class GrandAreaRules
                 unset($territory);
                 continue;
             }
+            // Failed states have no functioning economy to tax.
+            if (!empty($territory['failedState'])) {
+                $logs[] = 'Failed state: ' . self::str($territory, 'family') . ' (in ' . $key . ') cannot pay tribute to ' . $overlord;
+                unset($territory);
+                continue;
+            }
             if (self::num($territory, 'defiance') > 0) {
                 $logs[] = self::str($territory, 'family') . ' (in ' . $key . ') REFUSES tribute to ' . $overlord . '! (Defiance: ' . self::num($territory, 'defiance') . ')';
                 unset($territory);
@@ -542,6 +548,10 @@ class GrandAreaRules
 
         switch ($action) {
             case 'Skim':
+                if ($hasT && !empty($T['failedState']) && $targetKey !== $actorKey) {
+                    $logs[] = $actorKey . ' failed Skim (' . $targetKey . ' is a failed state — nothing left to take)';
+                    break;
+                }
                 if ($hasT) {
                     $transferred = min(10, self::num($T, 'wealth'));
                     $T['wealth'] = max(0, self::num($T, 'wealth') - $transferred);
@@ -585,7 +595,9 @@ class GrandAreaRules
                 $happinessLoss = $fortified
                     ? intval(ceil(max(8, 25 - $framing) / 2))
                     : max(8, 25 - $framing);
-                $wealthDamage = $fortified ? 5 : 10;
+                // Invasion loots the target: wealth transfers to the invader
+                // instead of vanishing, so the military layer can pay for itself.
+                $loot = min($fortified ? 5 : 10, self::num($T, 'wealth'));
                 $socialPenalty = max(0, 15 - intval(floor($framing / 2)));
                 $A['wealth'] = max(0, self::num($A, 'wealth') - 12);
                 $A['armies'] = max(0, self::num($A, 'armies') - 1);
@@ -596,7 +608,8 @@ class GrandAreaRules
                 $T['protected'] = false;
                 $T['protectedBy'] = null;
                 $T['happiness'] = max(0, self::num($T, 'happiness') - $happinessLoss);
-                $T['wealth'] = max(0, self::num($T, 'wealth') - $wealthDamage);
+                $T['wealth'] = max(0, self::num($T, 'wealth') - $loot);
+                $A['wealth'] = self::num($A, 'wealth') + $loot;
                 $T['fear'] = min(100, max(0, self::num($T, 'fear') + 10));
                 $T['governanceChangeSentiment'] = min(100, max(0, self::num($T, 'governanceChangeSentiment') + 8));
                 if (self::str($T, 'type') === 'Client' && !$fortified) {
@@ -604,7 +617,7 @@ class GrandAreaRules
                 }
                 $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - $socialPenalty);
                 $logs[] = $actorKey . ' invaded ' . $targetKey . ($framing > 0 ? ' with framing' : ' without framing')
-                    . ' (-12 wealth, -1 army, -' . $happinessLoss . ' happiness, -' . $socialPenalty . ' backlash)';
+                    . ' (-12 wealth, -1 army, -' . $happinessLoss . ' happiness, ' . $loot . ' wealth looted, -' . $socialPenalty . ' backlash)';
                 if ($fortified) {
                     $logs[] = $targetKey . ' fortifications blunt the invasion (damage halved, no rally for ' . $actorKey . ')';
                 }
@@ -628,6 +641,12 @@ class GrandAreaRules
                     $logs[] = $actorKey . ' failed Sanction (insufficient Political Capital)';
                     break;
                 }
+                $ownClientSanction = grandarea_own_client_sanction();
+                $ownClient = self::str($T, 'type') === 'Client' && self::str($T, 'clientOf') === self::str($A, 'family');
+                if ($ownClient && self::num($A, 'socialCapital') < $ownClientSanction['socialCost']) {
+                    $logs[] = $actorKey . ' failed Sanction (strangling their own client requires ' . $ownClientSanction['socialCost'] . ' Social Capital)';
+                    break;
+                }
                 $loss = min(18, self::num($T, 'wealth'));
                 $A['politicalCapital'] = max(0, self::num($A, 'politicalCapital') - 5);
                 $A['wealth'] = self::num($A, 'wealth') + intval(floor($loss * 0.25));
@@ -637,6 +656,11 @@ class GrandAreaRules
                 $T['governanceChangeSentiment'] = min(100, max(0, self::num($T, 'governanceChangeSentiment') + 5));
                 $T['sanctioned'] = true;
                 $logs[] = $actorKey . ' sanctioned ' . $targetKey . ' (-' . $loss . ' wealth, -12 happiness, -5 development)';
+                if ($ownClient) {
+                    $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - $ownClientSanction['socialCost']);
+                    $T['independenceSentiment'] = min(100, max(0, self::num($T, 'independenceSentiment') + $ownClientSanction['independenceGain']));
+                    $logs[] = $actorKey . ' strangles their own client ' . $targetKey . ': -' . $ownClientSanction['socialCost'] . ' Social Capital, independence +' . $ownClientSanction['independenceGain'];
+                }
                 break;
             case 'Protect':
                 if (!$hasT) {
@@ -740,19 +764,30 @@ class GrandAreaRules
                     $logs[] = $actorKey . ' failed ClientRealignment (' . $targetKey . ' is already their client)';
                     break;
                 }
-                $eligible = self::num($T, 'defiance') > 0
+                // Failed states are ripe for the picking: always eligible and at
+                // half the political price, but the new patron must bankroll a
+                // stabilization package to restart the economy.
+                $failedStateRules = grandarea_failed_state();
+                $failedTarget = !empty($T['failedState']);
+                $realignCost = $failedTarget ? $failedStateRules['realignmentCost'] : 12;
+                $eligible = $failedTarget
+                    || self::num($T, 'defiance') > 0
                     || self::num($T, 'independenceSentiment') >= 50
                     || self::num($T, 'realignmentPressure') >= 8;
                 if (!$eligible) {
                     $logs[] = $actorKey . ' failed ClientRealignment (' . $targetKey . ' is not ready to realign)';
                     break;
                 }
-                if (self::num($A, 'politicalCapital') < 12) {
+                if (self::num($A, 'politicalCapital') < $realignCost) {
                     $logs[] = $actorKey . ' failed ClientRealignment (insufficient Political Capital)';
                     break;
                 }
+                if ($failedTarget && self::num($A, 'wealth') < $failedStateRules['stabilizationCost']) {
+                    $logs[] = $actorKey . ' failed ClientRealignment (cannot afford the stabilization package for failed ' . $targetKey . ')';
+                    break;
+                }
                 $oldOverlord = self::str($T, 'clientOf') !== '' ? self::str($T, 'clientOf') : 'none';
-                $A['politicalCapital'] = max(0, self::num($A, 'politicalCapital') - 12);
+                $A['politicalCapital'] = max(0, self::num($A, 'politicalCapital') - $realignCost);
                 $A['socialCapital'] = max(0, self::num($A, 'socialCapital') - 4);
                 $T['clientOf'] = self::str($A, 'family');
                 $T['protected'] = true;
@@ -763,6 +798,12 @@ class GrandAreaRules
                 $T['happiness'] = min(200, max(0, self::num($T, 'happiness') + 4));
                 $T['independenceSentiment'] = min(100, max(0, self::num($T, 'independenceSentiment') + 10));
                 $logs[] = $actorKey . ' realigns ' . $targetKey . ' from ' . $oldOverlord . ' to ' . self::str($A, 'family');
+                if ($failedTarget) {
+                    $A['wealth'] = max(0, self::num($A, 'wealth') - $failedStateRules['stabilizationCost']);
+                    $T['wealth'] = self::num($T, 'wealth') + $failedStateRules['stabilizationAid'];
+                    $logs[] = $actorKey . ' bankrolls a stabilization package for ' . $targetKey
+                        . ' (-' . $failedStateRules['stabilizationCost'] . ' wealth, ' . $targetKey . ' +' . $failedStateRules['stabilizationAid'] . ' wealth)';
+                }
                 break;
             case 'RegionalRivalry':
                 if (!$hasT) {
@@ -793,6 +834,10 @@ class GrandAreaRules
                     $logs[] = $actorKey . ' failed DebtShakedown (cannot target self)';
                     break;
                 }
+                if (!empty($T['failedState'])) {
+                    $logs[] = $actorKey . ' failed DebtShakedown (' . $targetKey . ' is a failed state — nothing left to extract)';
+                    break;
+                }
                 if (self::num($A, 'politicalCapital') < 8) {
                     $logs[] = $actorKey . ' failed DebtShakedown (insufficient Political Capital)';
                     break;
@@ -816,6 +861,10 @@ class GrandAreaRules
                 }
                 if ($targetKey === $actorKey) {
                     $logs[] = $actorKey . ' failed EconomicExploitation (cannot target self)';
+                    break;
+                }
+                if (!empty($T['failedState'])) {
+                    $logs[] = $actorKey . ' failed EconomicExploitation (' . $targetKey . ' is a failed state — nothing left to extract)';
                     break;
                 }
                 if (self::num($A, 'socialCapital') < 4) {
@@ -891,6 +940,11 @@ class GrandAreaRules
                 $tp = self::num($T, 'politicalCapital');
                 $sentimentPressure = (self::num($T, 'governanceChangeSentiment') + self::num($T, 'factionalDivision') - self::num($T, 'fear')) / 300.0;
                 $base = 0.5 + ($ap - $tp) / 200.0 + $sentimentPressure;
+                if (!empty($T['failedState'])) {
+                    $failedStateRules = grandarea_failed_state();
+                    $base += $failedStateRules['coupOddsBonus'];
+                    $logs[] = $targetKey . ' is a failed state — the coup faces little organized resistance';
+                }
                 $base = max(0.1, min(0.95, $base));
                 $roll = self::seededRoll($seed, $idx);
                 if ($roll < $base) {
@@ -1022,6 +1076,12 @@ class GrandAreaRules
                 $A['independenceSentiment'] = min(100, max(0, self::num($A, 'independenceSentiment') + 3));
                 $T['independenceSentiment'] = min(100, max(0, self::num($T, 'independenceSentiment') + 3));
                 $logs[] = $actorKey . ' sends solidarity aid to ' . $targetKey . ' (+6 happiness, both +3 independence)';
+                // Solidarity with the truly poor moves real goods, not just morale.
+                $recoveryRules = grandarea_recovery();
+                if (self::num($T, 'wealth') < $recoveryRules['subsistenceWealthCeiling']) {
+                    $T['wealth'] = self::num($T, 'wealth') + 4;
+                    $logs[] = $actorKey . "'s solidarity convoys deliver goods to struggling " . $targetKey . ' (+4 wealth)';
+                }
                 break;
             case 'CounterIntel':
                 if (self::truthyField($A, 'counterIntelActive')) {
@@ -1179,13 +1239,24 @@ class GrandAreaRules
                 self::markOutcome($logs, $key, $data, 'Lost', 'a majority of active clients are defiant');
             } elseif ($type === 'Regional' && self::num($data, 'happiness') <= 20) {
                 self::markOutcome($logs, $key, $data, 'Lost', 'domestic happiness collapsed');
-            } elseif ($type === 'Client' && (self::num($data, 'wealth') <= 0 || self::num($data, 'happiness') <= 0)) {
-                self::markOutcome($logs, $key, $data, 'Lost', 'client wealth or happiness collapsed');
+            } elseif ($type === 'Client' && self::num($data, 'happiness') <= 0) {
+                self::markOutcome($logs, $key, $data, 'Lost', 'client happiness collapsed');
             }
 
             if (self::str($data, 'outcome') === 'Lost') {
                 unset($data);
                 continue;
+            }
+
+            // Failed-state transitions: zero wealth turns a client into a failed
+            // state rather than eliminating it; rebuilt wealth restores it.
+            $failedStateRules = grandarea_failed_state();
+            if ($type === 'Client' && empty($data['failedState']) && self::num($data, 'wealth') <= 0) {
+                $data['failedState'] = true;
+                $logs[] = '💥 ' . $key . ' collapses into a FAILED STATE (wealth hit zero)';
+            } elseif (!empty($data['failedState']) && self::num($data, 'wealth') >= $failedStateRules['recoveryWealthFloor']) {
+                $data['failedState'] = false;
+                $logs[] = $key . ' claws its way back from failed-state status';
             }
 
             $ownClientsCompliant = true;
@@ -1199,6 +1270,9 @@ class GrandAreaRules
                 self::markOutcome($logs, $key, $data, 'Won', 'hierarchy is stable and head wealth target is met');
             } elseif ($type === 'Regional' && self::num($data, 'wealth') >= $objectives['regionalWealthWin'] && self::num($data, 'politicalCapital') >= $objectives['regionalPoliticalWin']) {
                 self::markOutcome($logs, $key, $data, 'Won', 'regional wealth and political power targets are met');
+            } elseif ($type === 'Regional' && self::num($data, 'politicalCapital') >= $objectives['regionalInfluencePolitical']
+                && self::sphereClientCount($activeClients, $newState, $family) >= $objectives['regionalInfluenceClients']) {
+                self::markOutcome($logs, $key, $data, 'Won', 'regional built a rival sphere of influence');
             } elseif ($type === 'Client' && self::num($data, 'defiance') > 0
                 && self::num($data, 'happiness') >= $objectives['clientHappinessWin']
                 && self::num($data, 'development') >= $objectives['clientDevelopmentWin']
@@ -1227,15 +1301,37 @@ class GrandAreaRules
     private static function activeClientSnapshot($state)
     {
         $clients = array();
-        foreach ($state as $data) {
+        foreach ($state as $key => $data) {
             if (self::str($data, 'type') === 'Client' && !self::isEliminated($data)) {
                 $clients[] = array(
+                    'key' => $key,
                     'clientOf' => self::str($data, 'clientOf'),
                     'defiance' => self::num($data, 'defiance')
                 );
             }
         }
         return $clients;
+    }
+
+    /**
+     * Healthy sphere size for the regional influence win: compliant,
+     * non-failed clients of the family. failedState is read live from the
+     * pass state, mirroring the live object references JS closes over.
+     */
+    private static function sphereClientCount($activeClients, $state, $family)
+    {
+        $count = 0;
+        foreach ($activeClients as $client) {
+            if ($client['clientOf'] !== $family || $client['defiance'] > 0) {
+                continue;
+            }
+            $key = $client['key'];
+            if (isset($state[$key]) && !empty($state[$key]['failedState'])) {
+                continue;
+            }
+            $count++;
+        }
+        return $count;
     }
 
     /**
@@ -1384,12 +1480,20 @@ class GrandAreaRules
                 continue;
             }
             $parts = array();
+            $preWealth = self::num($data, 'wealth');
 
             // 1. Production: every territory produces wealth from its development.
             $production = $recovery['productionBase']
                 + intval(floor(self::num($data, 'development') / $recovery['productionDevelopmentDivisor']));
             $data['wealth'] = self::num($data, 'wealth') + $production;
             $parts[] = '+' . $production . ' wealth';
+
+            // 1b. Subsistence floor: informal economies keep desperate territories
+            // out of permanent pass-loops where no action is ever affordable.
+            if ($preWealth < $recovery['subsistenceWealthCeiling']) {
+                $data['wealth'] = self::num($data, 'wealth') + $recovery['subsistenceBonus'];
+                $parts[] = '+' . $recovery['subsistenceBonus'] . ' subsistence wealth';
+            }
 
             // 2. Stash trickle: poor family coffers skim a little national wealth.
             if (self::num($data, 'stash') < $recovery['stashTrickleCeiling']
@@ -1610,7 +1714,8 @@ class GrandAreaRules
 
         $resourceResult = self::resolveResourcePressure($newState);
         $sentimentResult = self::resolveSentiment($resourceResult['newState']);
-        $debtResult = self::applyDebtAndLegitimacyPressure($sentimentResult['newState']);
+        $instabilityResult = self::applyFailedStateInstability($sentimentResult['newState']);
+        $debtResult = self::applyDebtAndLegitimacyPressure($instabilityResult['newState']);
         $recoveryResult = self::applyCleanupRecovery($debtResult['newState']);
         $comebackResult = self::applyComebackPressure($recoveryResult['newState']);
         $majorityResult = self::updateDefianceMajorityCounters($comebackResult['newState']);
@@ -1622,6 +1727,7 @@ class GrandAreaRules
                 $logs,
                 $resourceResult['logs'],
                 $sentimentResult['logs'],
+                $instabilityResult['logs'],
                 $debtResult['logs'],
                 $recoveryResult['logs'],
                 $comebackResult['logs'],
@@ -1629,6 +1735,50 @@ class GrandAreaRules
                 $objectiveResult['logs']
             )
         );
+    }
+
+    /**
+     * Failed states export instability: refugees, smuggling routes, and armed
+     * factions spill across their borders every cleanup until somebody
+     * stabilizes them. Mirrors applyFailedStateInstability in
+     * frontend/rules.js (sorted keys keep the pass deterministic).
+     */
+    public static function applyFailedStateInstability($state)
+    {
+        $logs = array();
+        $newState = self::cloneTerritories($state);
+        $rules = grandarea_failed_state();
+
+        $sortedKeys = array_keys($newState);
+        sort($sortedKeys, SORT_STRING);
+
+        foreach ($sortedKeys as $sourceKey) {
+            $source = $newState[$sourceKey];
+            if (empty($source['failedState']) || self::isEliminated($source)) {
+                continue;
+            }
+            $affected = array();
+            $neighbors = isset($source['neighbors']) && is_array($source['neighbors']) ? $source['neighbors'] : array();
+            sort($neighbors, SORT_STRING);
+            foreach ($neighbors as $neighborKey) {
+                if (!isset($newState[$neighborKey]) || !self::isTerritory($newState[$neighborKey]) || self::isEliminated($newState[$neighborKey])) {
+                    continue;
+                }
+                $neighbor =& $newState[$neighborKey];
+                $neighbor['governanceChangeSentiment'] = min(100, max(0, self::num($neighbor, 'governanceChangeSentiment') + $rules['neighborGovernancePressure']));
+                $neighbor['factionalDivision'] = min(100, max(0, self::num($neighbor, 'factionalDivision') + $rules['neighborFactionalDivision']));
+                if (self::str($neighbor, 'type') === 'Client') {
+                    $neighbor['independenceSentiment'] = min(100, max(0, self::num($neighbor, 'independenceSentiment') + $rules['neighborClientIndependence']));
+                }
+                unset($neighbor);
+                $affected[] = $neighborKey;
+            }
+            if (count($affected) > 0) {
+                $logs[] = 'Failed-state instability: ' . $sourceKey . ' destabilizes ' . implode(', ', $affected);
+            }
+        }
+
+        return array('newState' => $newState, 'logs' => $logs);
     }
 
     /**

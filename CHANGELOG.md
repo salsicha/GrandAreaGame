@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Failed states + first-playtest fixes (from a full 12-round, 10-seat playtest of the previous build):
+  - **Failed states**: a client whose wealth hits 0 becomes a failed state instead of dying. It pays no tribute, cannot be Skimmed/DebtShakedown'd/Exploited ("nothing left to extract"), and every cleanup radiates instability into its neighbors (+3 governance pressure, +2 factional division, clients +2 independence). It is an easy sphere-of-influence target: ClientRealignment against it is always eligible at 6 Political Capital (half price) plus an 8-wealth stabilization package that delivers +12 wealth to the target, and coups against it get +0.25 success odds. Rebuilding to 10+ wealth restores normal play. Bleeding a client dry now hands rivals a cheap acquisition on your border instead of deleting a player.
+  - **Subsistence floor**: territories entering recovery below 25 wealth gain +4 extra wealth, ending the client poverty-lock where poor seats could only Pass for the back half of the game. `Solidarity` to a target below 25 wealth also delivers +4 wealth in goods.
+  - **Own-client sanctions cost legitimacy**: sanctioning your own client requires and costs an extra 12 Social Capital and raises the victim's independence sentiment by 8 — spiking your own client's win is still possible, but no longer a 5-Political-Capital bargain.
+  - **Invasions loot**: Invade's 10 wealth of target damage (5 vs fortified) is now a transfer to the invader, so the military layer can pay for itself instead of being strictly dominated by CovertInfluence.
+  - **Regional sphere-of-influence win**: a Regional now also wins at 140+ Political Capital with 2+ compliant, non-failed clients of its own family — a finish line for political play that never reaches the 320-wealth bar, and a reason to absorb failed states.
+  - **No crisis repeats**: when the crisis deck reshuffles, the crisis that just resolved is never placed on top (playtest adapter and BGA server).
+  - Implemented in both engines (27-scenario cross-engine parity, all identical), the prototype UI (failed-state badge, updated costs), the playtest adapter (legality mirrors, extraction guards), and the BGA module (`failedState` column, map styling, client affordability); 10 new/updated test groups (104 total passing); documented in RULES.md ("Failed States").
 - Five new actions and three new mechanics:
   - `Mobilize` (10 wealth + Oil access: +1 army, +1 fear) and `Launder` (6 stash into 5 Black Budget) complete the military and covert economies — both were wasting resources with no faucet.
   - `Crackdown` (6 Political Capital: +10 fear, -6 happiness, -8 governance pressure) makes the repression trade-off an explicit choice.

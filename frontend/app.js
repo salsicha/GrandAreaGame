@@ -538,12 +538,12 @@ const ACTION_RULES = {
   Pass: { target: 'self', cost: 'None', effect: 'No effect.' },
   Skim: { target: 'any', cost: 'Target wealth', effect: 'Move 10 target wealth to stash; target happiness -6.' },
   Propaganda: { target: 'any', cost: '8 stash', effect: 'Target happiness +10.' },
-  Invade: { target: 'other', cost: '12 wealth, 1 army, backlash', effect: 'Target invaded, wealth -10, happiness loss, fear +10.' },
-  Sanction: { target: 'other', cost: '5 Political Capital', effect: 'Target wealth, happiness, and development fall.' },
+  Invade: { target: 'other', cost: '12 wealth, 1 army, backlash', effect: 'Target invaded and looted (up to 10 wealth seized), happiness loss, fear +10.' },
+  Sanction: { target: 'other', cost: '5 Political Capital (+12 Social Capital vs own client)', effect: 'Target wealth, happiness, and development fall. Sanctioning your own client adds independence +8.' },
   Protect: { target: 'other', cost: '8 wealth, 6 stash', effect: 'Target protected, happiness +8, fear reduced.' },
   TributeHoliday: { target: 'controlledClient', cost: '8 wealth', effect: 'Client skips one tribute and loses 1 defiance.' },
   ProtectionDeal: { target: 'other', cost: '6 wealth, 4 stash', effect: 'Temporary protection; rival clients gain realignment pressure.' },
-  ClientRealignment: { target: 'rivalClient', cost: '12 Political Capital, 4 Social Capital', effect: 'Eligible client of another family switches patron.' },
+  ClientRealignment: { target: 'rivalClient', cost: '12 Political Capital, 4 Social Capital (failed states: 6 PC + 8 wealth stabilization)', effect: 'Eligible client of another family switches patron. Failed states are always eligible and receive +12 wealth aid.' },
   RegionalRivalry: { target: 'regionalOther', cost: '6 Political Capital', effect: 'Rival loses Political Capital and gains factional division.' },
   DebtShakedown: { target: 'other', cost: '8 Political Capital', effect: 'Extract up to 20 wealth and add target debt.' },
   EconomicExploitation: { target: 'other', cost: '4 Social Capital', effect: 'Extract wealth and stash; target development and happiness fall.' },
@@ -560,7 +560,7 @@ const ACTION_RULES = {
   Launder: { target: 'self', cost: '6 stash', effect: 'Convert stash into 5 Black Budget.' },
   Crackdown: { target: 'self', cost: '6 Political Capital', effect: 'Fear +10, happiness -6, governance pressure -8.' },
   GeneralStrike: { target: 'self', cost: '5 wealth, 6 happiness', effect: 'Client only: overlord loses 5 wealth and 3 Political Capital; independence +6.' },
-  Solidarity: { target: 'otherClient', cost: '6 wealth', effect: 'Client only: another client gains 6 happiness; both gain 3 independence.' }
+  Solidarity: { target: 'otherClient', cost: '6 wealth', effect: 'Client only: another client gains 6 happiness; both gain 3 independence. Targets below 25 wealth also gain 4 wealth.' }
 };
 
 function legalActionsFor(family){
@@ -583,7 +583,13 @@ function isActionLegal(family, action){
   if(action === 'Protect') return (data.stash||0) >= 6 && (data.wealth||0) >= 8;
   if(action === 'ProtectionDeal') return (data.stash||0) >= 4 && (data.wealth||0) >= 6;
   if(action === 'TributeHoliday') return (data.wealth||0) >= 8;
-  if(action === 'ClientRealignment') return (data.politicalCapital||0) >= 12;
+  if(action === 'ClientRealignment'){
+    if((data.politicalCapital||0) >= 12) return true;
+    // Failed states realign at half price plus a wealth-funded stabilization package.
+    const ownFamily = data.family;
+    const hasFailedTarget = territoryKeys().some(k=>k !== family && state[k].type === 'Client' && state[k].clientOf !== ownFamily && state[k].failedState);
+    return hasFailedTarget && (data.politicalCapital||0) >= 6 && (data.wealth||0) >= 8;
+  }
   if(action === 'DebtShakedown') return (data.politicalCapital||0) >= 8;
   if(action === 'EconomicExploitation') return (data.socialCapital||0) >= 4;
   if(action === 'MakeExample') return (data.socialCapital||0) >= 10;
@@ -686,6 +692,13 @@ function renderPlayersList(){
         const client = document.createElement('small');
         client.textContent = ` (${data.clientOf})`;
         name.appendChild(client);
+    }
+
+    if(data.failedState){
+        const failed = document.createElement('small');
+        failed.textContent = ' ⚠ FAILED STATE';
+        failed.title = 'Wealth collapsed to zero: no tribute, nothing to extract, destabilizes neighbors, cheap to realign or coup';
+        name.appendChild(failed);
     }
 
     if(isDead){

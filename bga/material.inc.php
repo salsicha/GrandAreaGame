@@ -6,7 +6,7 @@
  * self-contained. Regenerate after changing any source JSON with:
  *   node tools/generate-bga-material.js
  *
- * source-checksum: 73b943a03876c1dad63f28aed431fc4c32002ce53bcdb4960848c6dcacc66bf3
+ * source-checksum: 818bec185050e1f9b5a84c99f67e490ddab882e2d63732ca1126e9d9620d4787
  */
 
 require_once 'modules/php/constants.inc.php';
@@ -969,6 +969,8 @@ $this->balanceMaterial = array(
     'cleanupRecovery' => array(
         'productionBase' => 3,
         'productionDevelopmentDivisor' => 20,
+        'subsistenceWealthCeiling' => 25,
+        'subsistenceBonus' => 4,
         'stashTrickle' => 2,
         'stashTrickleCeiling' => 25,
         'stashTrickleMinWealth' => 10,
@@ -977,6 +979,20 @@ $this->balanceMaterial = array(
         'capitalRegenCap' => 150,
         'happinessRecovery' => 4,
         'happinessRecoveryCeiling' => 70
+    ),
+    'failedState' => array(
+        'recoveryWealthFloor' => 10,
+        'neighborGovernancePressure' => 3,
+        'neighborFactionalDivision' => 2,
+        'neighborClientIndependence' => 2,
+        'realignmentCost' => 6,
+        'coupOddsBonus' => 0.25,
+        'stabilizationCost' => 8,
+        'stabilizationAid' => 12
+    ),
+    'ownClientSanction' => array(
+        'socialCost' => 12,
+        'independenceGain' => 8
     ),
     'defiancePressure' => array(
         'socialPerClient' => 3,

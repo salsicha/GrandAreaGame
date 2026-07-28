@@ -1003,9 +1003,10 @@ test('cleanup recovery regenerates wealth stash capitals and happiness', () => {
   assert.equal(result.newState.Alpha.socialCapital, 52);
   assert.equal(result.newState.Alpha.politicalCapital, 150);
   assert.equal(result.newState.Alpha.happiness, 80);
-  // Beta: base production only, no trickle at stash 30, capitals at/over cap
-  // untouched, unrest recovery below the 70 happiness ceiling.
-  assert.equal(result.newState.Beta.wealth, 8);
+  // Beta: base production plus the +4 subsistence floor below 25 wealth, no
+  // trickle at stash 30, capitals at/over cap untouched, unrest recovery
+  // below the 70 happiness ceiling.
+  assert.equal(result.newState.Beta.wealth, 12);
   assert.equal(result.newState.Beta.stash, 30);
   assert.equal(result.newState.Beta.socialCapital, 150);
   assert.equal(result.newState.Beta.politicalCapital, 160);
@@ -1139,10 +1140,18 @@ test('asymmetric objectives apply role-specific losses', () => {
   });
   assert.equal(regional.newState.Regionalia.outcome, 'Lost');
 
+  // Zero wealth no longer kills a client outright: it becomes a failed state.
   const client = Rules.evaluateObjectives({
     Clientia: territory({ family: 'Client Family', type: 'Client', wealth: 0, happiness: 80 })
   });
-  assert.equal(client.newState.Clientia.outcome, 'Lost');
+  assert.notEqual(client.newState.Clientia.outcome, 'Lost');
+  assert.equal(client.newState.Clientia.failedState, true);
+
+  // Zero happiness still eliminates a client.
+  const brokenClient = Rules.evaluateObjectives({
+    Clientia: territory({ family: 'Client Family', type: 'Client', wealth: 30, happiness: 0 })
+  });
+  assert.equal(brokenClient.newState.Clientia.outcome, 'Lost');
 });
 
 test('player cards apply implemented effects', () => {
@@ -1472,6 +1481,10 @@ test('balance.json documentation blocks match the engine constants', () => {
     'balance.json cleanupRecovery drifted from RECOVERY in rules.js');
   assert.deepEqual(balance.defiancePressure, JSON.parse(JSON.stringify(Rules.DEFIANCE_PRESSURE)),
     'balance.json defiancePressure drifted from DEFIANCE_PRESSURE in rules.js');
+  assert.deepEqual(balance.failedState, JSON.parse(JSON.stringify(Rules.FAILED_STATE)),
+    'balance.json failedState drifted from FAILED_STATE in rules.js');
+  assert.deepEqual(balance.ownClientSanction, JSON.parse(JSON.stringify(Rules.OWN_CLIENT_SANCTION)),
+    'balance.json ownClientSanction drifted from OWN_CLIENT_SANCTION in rules.js');
   const source = readText('frontend', 'rules.js');
   assert.ok(source.includes(`UPRISING_HAPPINESS_SAFE_FLOOR = ${balance.uprising.happinessSafeFloor};`),
     'balance.json uprising.happinessSafeFloor drifted from rules.js');
@@ -1769,6 +1782,236 @@ test('BGA board template embeds the world map safely', () => {
     assert.ok(tpl.includes(`data-country="${key}"`), `template missing region ${key}`);
   }
   assert.doesNotMatch(tpl, /<style>/, 'inline <style> blocks break the BGA template engine');
+});
+
+test('a zero-wealth client becomes a failed state, pays no tribute, and recovers with wealth', () => {
+  const Rules = loadRules();
+
+  const collapsed = Rules.evaluateObjectives({
+    Poorland: territory({ family: 'PoorFam', wealth: 0, happiness: 80 })
+  });
+  assert.equal(collapsed.newState.Poorland.failedState, true);
+  assert.notEqual(collapsed.newState.Poorland.outcome, 'Lost');
+
+  const tribute = Rules.resolveTribute({
+    Poorland: territory({ family: 'PoorFam', clientOf: 'USA', wealth: 8, failedState: true }),
+    USA: territory({ family: 'USA', type: 'Head', clientOf: null, wealth: 200 })
+  });
+  assert.equal(tribute.newState.Poorland.wealth, 8);
+  assert.equal(tribute.newState.USA.wealth, 200);
+  assert.ok(tribute.logs.some(line => line.includes('cannot pay tribute')));
+
+  const recovered = Rules.evaluateObjectives({
+    Poorland: territory({ family: 'PoorFam', wealth: 12, happiness: 80, failedState: true })
+  });
+  assert.equal(recovered.newState.Poorland.failedState, false);
+});
+
+test('failed states radiate instability into neighboring territories', () => {
+  const Rules = loadRules();
+  const state = {
+    Ruins: territory({ family: 'RuinFam', wealth: 0, failedState: true, neighbors: ['NextDoor', 'BigNeighbor'] }),
+    NextDoor: territory({ family: 'NextFam', governanceChangeSentiment: 10, factionalDivision: 5, independenceSentiment: 20 }),
+    BigNeighbor: territory({ family: 'BigFam', type: 'Regional', clientOf: null, governanceChangeSentiment: 0, factionalDivision: 0 }),
+    FarAway: territory({ family: 'FarFam', governanceChangeSentiment: 0 })
+  };
+
+  const result = Rules.applyFailedStateInstability(state);
+  assert.equal(result.newState.NextDoor.governanceChangeSentiment, 13);
+  assert.equal(result.newState.NextDoor.factionalDivision, 7);
+  assert.equal(result.newState.NextDoor.independenceSentiment, 22);
+  assert.equal(result.newState.BigNeighbor.governanceChangeSentiment, 3);
+  assert.equal(result.newState.BigNeighbor.factionalDivision, 2);
+  assert.equal(result.newState.FarAway.governanceChangeSentiment, 0);
+  assert.ok(result.logs.some(line => line.includes('Failed-state instability: Ruins')));
+});
+
+test('failed states cannot be extracted from', () => {
+  const Rules = loadRules();
+  const state = {
+    Vulture: territory({ family: 'VultureFam', type: 'Regional', clientOf: null, politicalCapital: 60, socialCapital: 60, stash: 30 }),
+    Ruins: territory({ family: 'RuinFam', wealth: 0, failedState: true, happiness: 60 })
+  };
+
+  const result = Rules.resolveTurn(state, [
+    { family: 'Vulture', action: 'DebtShakedown', target: 'Ruins' }
+  ]);
+  assert.ok(result.logs.some(line => line.includes('failed DebtShakedown (Ruins is a failed state')));
+  assert.equal(result.newState.Vulture.politicalCapital, 60);
+
+  const exploit = Rules.resolveTurn(state, [
+    { family: 'Vulture', action: 'EconomicExploitation', target: 'Ruins' }
+  ]);
+  assert.ok(exploit.logs.some(line => line.includes('failed EconomicExploitation (Ruins is a failed state')));
+
+  const skim = Rules.resolveTurn(state, [
+    { family: 'Vulture', action: 'Skim', target: 'Ruins' }
+  ]);
+  assert.ok(skim.logs.some(line => line.includes('failed Skim (Ruins is a failed state')));
+  assert.equal(skim.newState.Vulture.stash, 30);
+});
+
+test('failed states realign cheaply with a stabilization package', () => {
+  const Rules = loadRules();
+  const state = {
+    Patron: territory({ family: 'PatronFam', type: 'Regional', clientOf: null, wealth: 60, politicalCapital: 8, socialCapital: 40 }),
+    Ruins: territory({ family: 'RuinFam', clientOf: 'USA', wealth: 0, failedState: true, happiness: 60, defiance: 0, independenceSentiment: 0, realignmentPressure: 0 })
+  };
+
+  // 8 PC is below the normal 12 but clears the failed-state discount of 6,
+  // and no eligibility flag is needed against a failed state.
+  const result = Rules.resolveTurn(state, [
+    { family: 'Patron', action: 'ClientRealignment', target: 'Ruins' }
+  ]);
+  assert.equal(result.newState.Ruins.clientOf, 'PatronFam');
+  assert.equal(result.newState.Patron.politicalCapital, 2);
+  assert.equal(result.newState.Patron.wealth, 52);
+  assert.equal(result.newState.Ruins.wealth, 12);
+  // The stabilization aid lifts the target past the recovery floor at the
+  // end-of-turn objectives pass.
+  assert.equal(result.newState.Ruins.failedState, false);
+  assert.ok(result.logs.some(line => line.includes('stabilization package')));
+});
+
+test('coups against failed states get an odds bonus', () => {
+  // Roll 0.6 beats the boosted 0.75 chance against a failed state but loses
+  // against the plain 0.5 baseline with matched political capital.
+  const state = () => ({
+    Plotter: territory({ family: 'PlotterFam', blackBudget: 20, politicalCapital: 50, socialCapital: 60 }),
+    Target: territory({ family: 'TargetFam', politicalCapital: 50, happiness: 90, fear: 0, governanceChangeSentiment: 0, factionalDivision: 0 })
+  });
+
+  const RulesA = loadRules([0.6]);
+  const normal = RulesA.resolveTurn(state(), [{ family: 'Plotter', action: 'Coup', target: 'Target' }]);
+  assert.equal(normal.newState.Target.family, 'TargetFam');
+
+  const RulesB = loadRules([0.6]);
+  const failedTarget = state();
+  failedTarget.Target.wealth = 0;
+  failedTarget.Target.failedState = true;
+  const boosted = RulesB.resolveTurn(failedTarget, [{ family: 'Plotter', action: 'Coup', target: 'Target' }]);
+  assert.equal(boosted.newState.Target.family, 'PlotterFam');
+  assert.ok(boosted.logs.some(line => line.includes('little organized resistance')));
+});
+
+test('sanctioning your own client costs heavy legitimacy', () => {
+  const Rules = loadRules();
+  const state = {
+    Overlord: territory({ family: 'OverFam', type: 'Head', clientOf: null, politicalCapital: 50, socialCapital: 40, wealth: 200 }),
+    Vassal: territory({ family: 'VassalFam', clientOf: 'OverFam', wealth: 80, happiness: 100, independenceSentiment: 10 })
+  };
+
+  const result = Rules.resolveTurn(state, [
+    { family: 'Overlord', action: 'Sanction', target: 'Vassal' }
+  ]);
+  assert.equal(result.newState.Overlord.socialCapital, 40 - 12);
+  assert.equal(result.newState.Vassal.independenceSentiment, 18);
+  assert.ok(result.logs.some(line => line.includes('strangles their own client')));
+
+  // Below the 12 Social Capital gate the sanction is refused outright.
+  const poorState = {
+    Overlord: territory({ family: 'OverFam', type: 'Head', clientOf: null, politicalCapital: 50, socialCapital: 8, wealth: 200 }),
+    Vassal: territory({ family: 'VassalFam', clientOf: 'OverFam', wealth: 80, happiness: 100 })
+  };
+  const refused = Rules.resolveTurn(poorState, [
+    { family: 'Overlord', action: 'Sanction', target: 'Vassal' }
+  ]);
+  assert.equal(refused.newState.Vassal.wealth, 80);
+  assert.ok(refused.logs.some(line => line.includes('strangling their own client requires 12 Social Capital')));
+
+  // Sanctioning a rival's client carries no extra legitimacy cost.
+  const rivalState = {
+    Overlord: territory({ family: 'OverFam', type: 'Head', clientOf: null, politicalCapital: 50, socialCapital: 40, wealth: 200 }),
+    Other: territory({ family: 'OtherFam', clientOf: 'RivalFam', wealth: 80, happiness: 100 })
+  };
+  const rival = Rules.resolveTurn(rivalState, [
+    { family: 'Overlord', action: 'Sanction', target: 'Other' }
+  ]);
+  assert.equal(rival.newState.Overlord.socialCapital, 40);
+});
+
+test('invasions loot the target instead of destroying wealth', () => {
+  const Rules = loadRules();
+  const state = {
+    Warlord: territory({ family: 'WarFam', type: 'Regional', clientOf: null, wealth: 50, armies: 2, socialCapital: 60, politicalCapital: 50 }),
+    Victim: territory({ family: 'VictimFam', wealth: 40, happiness: 100 })
+  };
+
+  const result = Rules.resolveTurn(state, [
+    { family: 'Warlord', action: 'Invade', target: 'Victim' }
+  ]);
+  // -12 invasion cost, +10 looted from the victim.
+  assert.equal(result.newState.Warlord.wealth, 48);
+  assert.equal(result.newState.Victim.wealth, 30);
+  assert.ok(result.logs.some(line => line.includes('10 wealth looted')));
+});
+
+test('regionals win by building a rival sphere of influence', () => {
+  const Rules = loadRules();
+
+  const win = Rules.evaluateObjectives({
+    Riser: territory({ family: 'RiserFam', type: 'Regional', clientOf: null, wealth: 100, politicalCapital: 140, happiness: 90 }),
+    LoyalA: territory({ family: 'LoyalA', clientOf: 'RiserFam', defiance: 0, wealth: 50, happiness: 80 }),
+    LoyalB: territory({ family: 'LoyalB', clientOf: 'RiserFam', defiance: 0, wealth: 50, happiness: 80 })
+  });
+  assert.equal(win.newState.Riser.outcome, 'Won');
+  assert.ok(win.logs.some(line => line.includes('rival sphere of influence')));
+
+  // Defiant or failed clients do not count toward the sphere.
+  const noWin = Rules.evaluateObjectives({
+    Riser: territory({ family: 'RiserFam', type: 'Regional', clientOf: null, wealth: 100, politicalCapital: 140, happiness: 90 }),
+    LoyalA: territory({ family: 'LoyalA', clientOf: 'RiserFam', defiance: 1, wealth: 50, happiness: 80 }),
+    LoyalB: territory({ family: 'LoyalB', clientOf: 'RiserFam', defiance: 0, wealth: 0, failedState: true, happiness: 80 })
+  });
+  assert.notEqual(noWin.newState.Riser.outcome, 'Won');
+
+  // Political capital below 140 is not enough either.
+  const lowPc = Rules.evaluateObjectives({
+    Riser: territory({ family: 'RiserFam', type: 'Regional', clientOf: null, wealth: 100, politicalCapital: 139, happiness: 90 }),
+    LoyalA: territory({ family: 'LoyalA', clientOf: 'RiserFam', defiance: 0, wealth: 50, happiness: 80 }),
+    LoyalB: territory({ family: 'LoyalB', clientOf: 'RiserFam', defiance: 0, wealth: 50, happiness: 80 })
+  });
+  assert.notEqual(lowPc.newState.Riser.outcome, 'Won');
+});
+
+test('solidarity delivers wealth to struggling clients', () => {
+  const Rules = loadRules();
+  const state = {
+    Comrade: territory({ family: 'ComradeFam', wealth: 40, happiness: 90 }),
+    Struggling: territory({ family: 'StruggleFam', clientOf: 'OtherFam', wealth: 10, happiness: 60 })
+  };
+
+  const result = Rules.resolveTurn(state, [
+    { family: 'Comrade', action: 'Solidarity', target: 'Struggling' }
+  ]);
+  assert.equal(result.newState.Struggling.wealth, 14);
+  assert.ok(result.logs.some(line => line.includes('solidarity convoys')));
+
+  // Rich targets get morale only, no goods.
+  const richState = {
+    Comrade: territory({ family: 'ComradeFam', wealth: 40, happiness: 90 }),
+    Comfortable: territory({ family: 'ComfyFam', clientOf: 'OtherFam', wealth: 80, happiness: 60 })
+  };
+  const rich = Rules.resolveTurn(richState, [
+    { family: 'Comrade', action: 'Solidarity', target: 'Comfortable' }
+  ]);
+  assert.equal(rich.newState.Comfortable.wealth, 80);
+});
+
+test('crisis deck reshuffles never repeat the crisis that just resolved', () => {
+  const { JavaScriptGameAdapter } = require(path.join(repoRoot, 'playtest', 'src', 'engine', 'jsAdapter.js'));
+  const adapter = new JavaScriptGameAdapter();
+  // Exhausted draw pile: the next draw reshuffles the discard. Across many
+  // reshuffle seeds the card that just resolved (last discard entry) must
+  // never surface as the immediate next crisis.
+  for (let i = 0; i < 25; i++) {
+    const state = {
+      crisisDeck: { drawPile: [], discard: ['global_austerity', 'oil_embargo', 'grain_price_spike', 'guatemala1954'] }
+    };
+    adapter.drawCrisis(state, `reshuffle-test-${i}`);
+    const drawn = state.crisisDeck.discard[0];
+    assert.notEqual(drawn, 'guatemala1954', `seed ${i} drew the crisis that just resolved`);
+  }
 });
 
 const cliArgs = process.argv.slice(2);

@@ -13,6 +13,8 @@
     headWealthWin: 400,
     regionalWealthWin: 320,
     regionalPoliticalWin: 130,
+    regionalInfluencePolitical: 140,
+    regionalInfluenceClients: 2,
     clientHappinessWin: 120,
     clientDevelopmentWin: 70,
     clientIndependenceWin: 60,
@@ -22,6 +24,8 @@
   const RECOVERY = {
     productionBase: 3,
     productionDevelopmentDivisor: 20,
+    subsistenceWealthCeiling: 25,
+    subsistenceBonus: 4,
     stashTrickle: 2,
     stashTrickleCeiling: 25,
     stashTrickleMinWealth: 10,
@@ -56,6 +60,30 @@
     threshold: 90,
     politicalPenalty: 6,
     sentimentRelief: 30
+  };
+
+  // A client whose wealth collapses to zero becomes a failed state instead of
+  // dying: it stops paying tribute, has nothing left to extract, radiates
+  // instability into neighboring territories each cleanup, and is cheap for
+  // rival powers to fold into their sphere of influence. It recovers once its
+  // wealth climbs back above the recovery floor.
+  const FAILED_STATE = {
+    recoveryWealthFloor: 10,
+    neighborGovernancePressure: 3,
+    neighborFactionalDivision: 2,
+    neighborClientIndependence: 2,
+    realignmentCost: 6,
+    coupOddsBonus: 0.25,
+    stabilizationCost: 8,
+    stabilizationAid: 12
+  };
+
+  // Sanctioning your own client is a legitimacy catastrophe: the hierarchy
+  // exists to protect clients, so strangling one costs heavy Social Capital
+  // and pushes the victim toward independence.
+  const OWN_CLIENT_SANCTION = {
+    socialCost: 12,
+    independenceGain: 8
   };
 
   const AGENDA_BONUS_SCORE = 150;
@@ -391,17 +419,33 @@
         markOutcome(logs, key, data, 'Lost', 'a majority of active clients are defiant');
       } else if(data.type === 'Regional' && (data.happiness || 0) <= 20){
         markOutcome(logs, key, data, 'Lost', 'domestic happiness collapsed');
-      } else if(data.type === 'Client' && ((data.wealth || 0) <= 0 || (data.happiness || 0) <= 0)){
-        markOutcome(logs, key, data, 'Lost', 'client wealth or happiness collapsed');
+      } else if(data.type === 'Client' && (data.happiness || 0) <= 0){
+        markOutcome(logs, key, data, 'Lost', 'client happiness collapsed');
       }
 
       if(data.outcome === 'Lost') return;
+
+      // Failed-state transitions: zero wealth turns a client into a failed
+      // state rather than eliminating it; rebuilt wealth restores it.
+      if(data.type === 'Client' && !data.failedState && (data.wealth || 0) <= 0){
+        data.failedState = true;
+        logs.push(`💥 ${key} collapses into a FAILED STATE (wealth hit zero)`);
+      } else if(data.failedState && (data.wealth || 0) >= FAILED_STATE.recoveryWealthFloor){
+        data.failedState = false;
+        logs.push(`${key} claws its way back from failed-state status`);
+      }
+
+      function sphereClientCount(family){
+        return activeClients.filter(([, client]) => client.clientOf === family && (client.defiance || 0) === 0 && !client.failedState).length;
+      }
 
       const ownClientsCompliant = activeClients.every(([, client]) => client.clientOf !== data.family || (client.defiance || 0) === 0);
       if(data.type === 'Head' && (data.wealth || 0) >= OBJECTIVES.headWealthWin && ownClientsCompliant){
         markOutcome(logs, key, data, 'Won', 'hierarchy is stable and head wealth target is met');
       } else if(data.type === 'Regional' && (data.wealth || 0) >= OBJECTIVES.regionalWealthWin && (data.politicalCapital || 0) >= OBJECTIVES.regionalPoliticalWin){
         markOutcome(logs, key, data, 'Won', 'regional wealth and political power targets are met');
+      } else if(data.type === 'Regional' && (data.politicalCapital || 0) >= OBJECTIVES.regionalInfluencePolitical && sphereClientCount(data.family) >= OBJECTIVES.regionalInfluenceClients){
+        markOutcome(logs, key, data, 'Won', 'regional built a rival sphere of influence');
       } else if(data.type === 'Client' && (data.defiance || 0) > 0 && (data.happiness || 0) >= OBJECTIVES.clientHappinessWin && (data.development || 0) >= OBJECTIVES.clientDevelopmentWin && (data.independenceSentiment || 0) >= OBJECTIVES.clientIndependenceWin){
         markOutcome(logs, key, data, 'Won', 'defiant client built a successful good example');
       }
@@ -587,6 +631,36 @@
     return { newState, logs };
   }
 
+  // Failed states export instability: refugees, smuggling routes, and armed
+  // factions spill across their borders every cleanup until somebody
+  // stabilizes them. Sorted keys keep the pass deterministic.
+  function applyFailedStateInstability(state){
+    const logs = [];
+    const newState = cloneTerritories(state);
+
+    Object.keys(newState).sort().forEach(sourceKey=>{
+      const source = newState[sourceKey];
+      if(!source || !source.failedState || isEliminated(source)) return;
+      const affected = [];
+      const neighbors = Array.isArray(source.neighbors) ? source.neighbors.slice().sort() : [];
+      neighbors.forEach(neighborKey=>{
+        const neighbor = newState[neighborKey];
+        if(!neighbor || !isTerritoryState(neighbor) || isEliminated(neighbor)) return;
+        neighbor.governanceChangeSentiment = clamp((neighbor.governanceChangeSentiment || 0) + FAILED_STATE.neighborGovernancePressure, 0, 100);
+        neighbor.factionalDivision = clamp((neighbor.factionalDivision || 0) + FAILED_STATE.neighborFactionalDivision, 0, 100);
+        if(neighbor.type === 'Client'){
+          neighbor.independenceSentiment = clamp((neighbor.independenceSentiment || 0) + FAILED_STATE.neighborClientIndependence, 0, 100);
+        }
+        affected.push(neighborKey);
+      });
+      if(affected.length){
+        logs.push(`Failed-state instability: ${sourceKey} destabilizes ${affected.join(', ')}`);
+      }
+    });
+
+    return { newState, logs };
+  }
+
   // Cleanup-phase recovery: a small deterministic economic and civic
   // regeneration that keeps entropy from deciding games while leaving every
   // deliberate attack strictly stronger than the regeneration it fights.
@@ -598,11 +672,19 @@
       const data = newState[key];
       if(isEliminated(data)) return;
       const parts = [];
+      const preWealth = data.wealth || 0;
 
       // 1. Production: every territory produces wealth from its development.
       const production = RECOVERY.productionBase + Math.floor((data.development || 0) / RECOVERY.productionDevelopmentDivisor);
       data.wealth = (data.wealth || 0) + production;
       parts.push(`+${production} wealth`);
+
+      // 1b. Subsistence floor: informal economies keep desperate territories
+      // out of permanent pass-loops where no action is ever affordable.
+      if(preWealth < RECOVERY.subsistenceWealthCeiling){
+        data.wealth += RECOVERY.subsistenceBonus;
+        parts.push(`+${RECOVERY.subsistenceBonus} subsistence wealth`);
+      }
 
       // 2. Stash trickle: poor family coffers skim a little national wealth.
       if((data.stash || 0) < RECOVERY.stashTrickleCeiling && (data.wealth || 0) >= RECOVERY.stashTrickleMinWealth){
@@ -758,6 +840,7 @@
         }
         case 'Skim':{
           const amt = 10;
+          if(T && T.failedState && target !== actor){ logs.push(`${actor} failed Skim (${target} is a failed state — nothing left to take)`); break; }
           if(T){ const transferred = Math.min(amt, T.wealth||0); T.wealth = clamp((T.wealth||0) - transferred, 0); A.stash = (A.stash||0) + transferred; T.happiness = clamp((T.happiness||0) - 6, 0); logs.push(`${actor} skimmed ${transferred} from ${target}`); }
           break;
         }
@@ -815,6 +898,11 @@
           A.independenceSentiment = clamp((A.independenceSentiment||0) + 3, 0, 100);
           T.independenceSentiment = clamp((T.independenceSentiment||0) + 3, 0, 100);
           logs.push(`${actor} sends solidarity aid to ${target} (+6 happiness, both +3 independence)`);
+          // Solidarity with the truly poor moves real goods, not just morale.
+          if((T.wealth||0) < RECOVERY.subsistenceWealthCeiling){
+            T.wealth = (T.wealth||0) + 4;
+            logs.push(`${actor}'s solidarity convoys deliver goods to struggling ${target} (+4 wealth)`);
+          }
           break;
         }
         case 'Propaganda':{
@@ -834,7 +922,9 @@
             const fortified = !!T.fortified;
             const framing = effectiveFraming(actor, spendFraming(A, entry.framing, 'Invade', logs));
             const happinessLoss = fortified ? Math.ceil(Math.max(8, 25 - framing) / 2) : Math.max(8, 25 - framing);
-            const wealthDamage = fortified ? 5 : 10;
+            // Invasion loots the target: wealth transfers to the invader
+            // instead of vanishing, so the military layer can pay for itself.
+            const loot = Math.min(fortified ? 5 : 10, T.wealth||0);
             const socialPenalty = Math.max(0, 15 - Math.floor(framing / 2));
             A.wealth = clamp((A.wealth||0) - wealthCost, 0);
             A.armies = clamp((A.armies||0) - armyCost, 0);
@@ -843,12 +933,13 @@
             T.protected = false;
             T.protectedBy = null;
             T.happiness = clamp((T.happiness||0) - happinessLoss, 0);
-            T.wealth = clamp((T.wealth||0) - wealthDamage, 0);
+            T.wealth = clamp((T.wealth||0) - loot, 0);
+            A.wealth = (A.wealth||0) + loot;
             T.fear = clamp((T.fear||0) + 10, 0, 100);
             T.governanceChangeSentiment = clamp((T.governanceChangeSentiment||0) + 8, 0, 100);
             if(T.type === 'Client' && !fortified) T.defiance = (T.defiance||0) + 1;
             A.socialCapital = clamp((A.socialCapital||0) - socialPenalty, 0);
-            logs.push(`${actor} invaded ${target}${framing > 0 ? ' with framing' : ' without framing'} (-${wealthCost} wealth, -${armyCost} army, -${happinessLoss} happiness, -${socialPenalty} backlash)`);
+            logs.push(`${actor} invaded ${target}${framing > 0 ? ' with framing' : ' without framing'} (-${wealthCost} wealth, -${armyCost} army, -${happinessLoss} happiness, ${loot} wealth looted, -${socialPenalty} backlash)`);
             if(fortified){
               logs.push(`${target} fortifications blunt the invasion (damage halved, no rally for ${actor})`);
             }
@@ -865,6 +956,8 @@
           if(target === actor){ logs.push(`${actor} failed Sanction (cannot target self)`); break; }
           const cost = 5;
           if((A.politicalCapital||0) < cost){ logs.push(`${actor} failed Sanction (insufficient Political Capital)`); break; }
+          const ownClient = T.type === 'Client' && T.clientOf === A.family;
+          if(ownClient && (A.socialCapital||0) < OWN_CLIENT_SANCTION.socialCost){ logs.push(`${actor} failed Sanction (strangling their own client requires ${OWN_CLIENT_SANCTION.socialCost} Social Capital)`); break; }
           const loss = Math.min(18, T.wealth||0);
           A.politicalCapital = clamp((A.politicalCapital||0) - cost, 0);
           A.wealth = (A.wealth||0) + Math.floor(loss * 0.25);
@@ -874,6 +967,11 @@
           T.governanceChangeSentiment = clamp((T.governanceChangeSentiment||0) + 5, 0, 100);
           T.sanctioned = true;
           logs.push(`${actor} sanctioned ${target} (-${loss} wealth, -12 happiness, -5 development)`);
+          if(ownClient){
+            A.socialCapital = clamp((A.socialCapital||0) - OWN_CLIENT_SANCTION.socialCost, 0);
+            T.independenceSentiment = clamp((T.independenceSentiment||0) + OWN_CLIENT_SANCTION.independenceGain, 0, 100);
+            logs.push(`${actor} strangles their own client ${target}: -${OWN_CLIENT_SANCTION.socialCost} Social Capital, independence +${OWN_CLIENT_SANCTION.independenceGain}`);
+          }
           break;
         }
         case 'Protect':{
@@ -940,10 +1038,15 @@
           if(target === actor){ logs.push(`${actor} failed ClientRealignment (cannot target self)`); break; }
           if(T.type !== 'Client'){ logs.push(`${actor} failed ClientRealignment (${target} is not a client)`); break; }
           if(T.clientOf === A.family){ logs.push(`${actor} failed ClientRealignment (${target} is already their client)`); break; }
-          const cost = 12;
-          const eligible = (T.defiance||0) > 0 || (T.independenceSentiment||0) >= 50 || (T.realignmentPressure||0) >= 8;
+          // Failed states are ripe for the picking: always eligible and at
+          // half the political price, but the new patron must bankroll a
+          // stabilization package to restart the economy.
+          const failedTarget = !!T.failedState;
+          const cost = failedTarget ? FAILED_STATE.realignmentCost : 12;
+          const eligible = failedTarget || (T.defiance||0) > 0 || (T.independenceSentiment||0) >= 50 || (T.realignmentPressure||0) >= 8;
           if(!eligible){ logs.push(`${actor} failed ClientRealignment (${target} is not ready to realign)`); break; }
           if((A.politicalCapital||0) < cost){ logs.push(`${actor} failed ClientRealignment (insufficient Political Capital)`); break; }
+          if(failedTarget && (A.wealth||0) < FAILED_STATE.stabilizationCost){ logs.push(`${actor} failed ClientRealignment (cannot afford the stabilization package for failed ${target})`); break; }
           const oldOverlord = T.clientOf || 'none';
           A.politicalCapital = clamp((A.politicalCapital||0) - cost, 0);
           A.socialCapital = clamp((A.socialCapital||0) - 4, 0);
@@ -956,6 +1059,11 @@
           T.happiness = clamp((T.happiness||0) + 4, 0, 200);
           T.independenceSentiment = clamp((T.independenceSentiment||0) + 10, 0, 100);
           logs.push(`${actor} realigns ${target} from ${oldOverlord} to ${A.family}`);
+          if(failedTarget){
+            A.wealth = clamp((A.wealth||0) - FAILED_STATE.stabilizationCost, 0);
+            T.wealth = (T.wealth||0) + FAILED_STATE.stabilizationAid;
+            logs.push(`${actor} bankrolls a stabilization package for ${target} (-${FAILED_STATE.stabilizationCost} wealth, ${target} +${FAILED_STATE.stabilizationAid} wealth)`);
+          }
           break;
         }
         case 'RegionalRivalry':{
@@ -974,6 +1082,7 @@
         case 'DebtShakedown':{
           if(!T){ logs.push(`${actor} attempted DebtShakedown against missing target ${target}`); break; }
           if(target === actor){ logs.push(`${actor} failed DebtShakedown (cannot target self)`); break; }
+          if(T.failedState){ logs.push(`${actor} failed DebtShakedown (${target} is a failed state — nothing left to extract)`); break; }
           const cost = 8;
           if((A.politicalCapital||0) < cost){ logs.push(`${actor} failed DebtShakedown (insufficient Political Capital)`); break; }
           const collected = Math.min(20, T.wealth||0);
@@ -990,6 +1099,7 @@
         case 'EconomicExploitation':{
           if(!T){ logs.push(`${actor} attempted EconomicExploitation against missing target ${target}`); break; }
           if(target === actor){ logs.push(`${actor} failed EconomicExploitation (cannot target self)`); break; }
+          if(T.failedState){ logs.push(`${actor} failed EconomicExploitation (${target} is a failed state — nothing left to extract)`); break; }
           const cost = 4;
           if((A.socialCapital||0) < cost){ logs.push(`${actor} failed EconomicExploitation (insufficient Social Capital)`); break; }
           const extracted = Math.min(12, T.wealth||0);
@@ -1050,7 +1160,12 @@
           }
           const ap = (A.politicalCapital||0); const tp = (T.politicalCapital||0);
           const sentimentPressure = ((T.governanceChangeSentiment||0) + (T.factionalDivision||0) - (T.fear||0)) / 300.0;
-          let base = 0.5 + (ap - tp) / 200.0 + sentimentPressure; base = clamp(base, 0.1, 0.95);
+          let base = 0.5 + (ap - tp) / 200.0 + sentimentPressure;
+          if(T.failedState){
+            base += FAILED_STATE.coupOddsBonus;
+            logs.push(`${target} is a failed state — the coup faces little organized resistance`);
+          }
+          base = clamp(base, 0.1, 0.95);
           const roll = random();
           if(roll < base){
             // successful coup: replace target's family control (simplified)
@@ -1217,12 +1332,13 @@
 
     const resourceResult = resolveResourcePressure(newState);
     const sentimentResult = resolveSentiment(resourceResult.newState);
-    const debtResult = applyDebtAndLegitimacyPressure(sentimentResult.newState);
+    const instabilityResult = applyFailedStateInstability(sentimentResult.newState);
+    const debtResult = applyDebtAndLegitimacyPressure(instabilityResult.newState);
     const recoveryResult = applyCleanupRecovery(debtResult.newState);
     const comebackResult = applyComebackPressure(recoveryResult.newState);
     const majorityResult = updateDefianceMajorityCounters(comebackResult.newState);
     const objectiveResult = evaluateObjectives(majorityResult.newState);
-    return { newState: objectiveResult.newState, logs: logs.concat(resourceResult.logs, sentimentResult.logs, debtResult.logs, recoveryResult.logs, comebackResult.logs, majorityResult.logs, objectiveResult.logs) };
+    return { newState: objectiveResult.newState, logs: logs.concat(resourceResult.logs, sentimentResult.logs, instabilityResult.logs, debtResult.logs, recoveryResult.logs, comebackResult.logs, majorityResult.logs, objectiveResult.logs) };
   }
 
   function resolveTribute(state){
@@ -1247,6 +1363,12 @@
       if((t.tributeHoliday||0) > 0){
         t.tributeHoliday = Math.max(0, (t.tributeHoliday||0) - 1);
         logs.push(`Tribute holiday: ${t.family} (in ${key}) skips tribute to ${overlord}`);
+        return;
+      }
+
+      // Failed states have no functioning economy to tax.
+      if(t.failedState){
+        logs.push(`Failed state: ${t.family} (in ${key}) cannot pay tribute to ${overlord}`);
         return;
       }
 
@@ -1438,5 +1560,5 @@
     return { newState, logs };
   }
 
-  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, NARRATIVE, DEBT_PRESSURE, LEGITIMACY_CRISIS, AGENDA_BONUS_SCORE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, evaluateAgenda, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, applyDebtAndLegitimacyPressure, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
+  window.Rules = { OBJECTIVES, ROUND_PHASES, RECOVERY, DEFIANCE_PRESSURE, NARRATIVE, DEBT_PRESSURE, LEGITIMACY_CRISIS, FAILED_STATE, OWN_CLIENT_SANCTION, AGENDA_BONUS_SCORE, createSeededRandom, resolveTurn, resolveCleanup, resolveTribute, resolveCard, evaluateObjectives, evaluateAgenda, applyCrisis, applyDefianceContagion, applyUnansweredDefiancePressure, applyComebackPressure, applyCleanupRecovery, applyDebtAndLegitimacyPressure, applyFailedStateInstability, updateDefianceMajorityCounters, resolveResourcePressure, resolveSentiment, availableResourcesFor };
 })();

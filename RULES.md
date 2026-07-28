@@ -59,9 +59,10 @@ Regional Families are middle powers. They are not direct clients, but they do no
 
 Prototype mapping: `type: "Regional"` and `clientOf: null`.
 
-Win condition in the prototype:
+Win conditions in the prototype (either path):
 
 - Win when wealth is at least `320` and political capital is at least `130`.
+- Win by sphere of influence: political capital at least `140` while at least `2` of your own clients are compliant and not failed states. Political play has a finish line without matching the wealth race.
 
 Loss conditions in the prototype:
 
@@ -88,7 +89,8 @@ Loss conditions in the prototype:
 
 - Lose when personal, political, or social capital reaches `0`.
 - Lose when an uprising collapses family control.
-- Lose when wealth or national happiness reaches `0`.
+- Lose when national happiness reaches `0`.
+- Wealth reaching `0` no longer eliminates a client: the territory becomes a failed state instead (see Failed States below).
 
 ## Independent/Defiant State
 
@@ -102,6 +104,22 @@ Defiance is a status, not a separate `type` in the current prototype.
 Prototype mapping: `type: "Client"` with `defiance > 0` for defiance. A future implementation can add `type: "Independent"` once setup, tribute, victory, and targeting rules support it.
 
 In the current prototype, the defiant-client win condition is the independent-state path.
+
+## Failed States
+
+A client whose wealth collapses to `0` becomes a failed state instead of being eliminated. The family survives in the ruins, but the territory changes character: it stops being an economy and starts being a problem for everyone around it — and an opportunity for anyone ambitious.
+
+While a territory is a failed state:
+
+- It pays no tribute (`there is nothing left to tax`).
+- It cannot be targeted by `Skim`, `DebtShakedown`, or `EconomicExploitation` — there is nothing left to extract.
+- Each cleanup it radiates instability into every neighboring territory: `+3` governance-change pressure and `+2` factional division, and neighboring clients also gain `+2` independence sentiment. Letting a neighbor rot is never free.
+- It is an easy sphere-of-influence target: `ClientRealignment` against it is always eligible and costs only `6` Political Capital (instead of `12`), but the new patron must bankroll a stabilization package of `8` wealth, which delivers `+12` wealth to the failed state and normally lifts it straight out of failed status.
+- `Coup` attempts against it gain `+0.25` success odds — there is little organized resistance left.
+
+Recovery: a failed state that rebuilds its wealth to `10` or more (through recovery production, the subsistence floor, `Solidarity` convoys, or a patron's stabilization package) sheds the failed-state status and resumes normal play, including tribute.
+
+The design intent is a satirical one: great powers rarely mourn a collapsed state — they compete to inherit it. Bleeding a client dry hands your rivals a cheap acquisition on your border.
 
 ## Ministry of Truth Framing
 
@@ -162,7 +180,7 @@ Sentiment tracks political pressure inside a territory.
 
 ## Cleanup Recovery And Collapse
 
-Cleanup resolves in a fixed order: capital-zero checks, protection and pressure decay, uprising checks, resource pressure, sentiment, debt service and legitimacy crises, recovery, comeback pressure, the defiant-majority counter update, then objectives.
+Cleanup resolves in a fixed order: capital-zero checks, protection and pressure decay, uprising checks, resource pressure, sentiment, failed-state instability, debt service and legitimacy crises, recovery, comeback pressure, the defiant-majority counter update, then objectives.
 
 - Debt service: every indebted territory pays `floor(debt / 8)` wealth; at `50` or more debt a default crisis costs `5` Political and `5` Social Capital and restructures debt to half.
 - Leadership crisis: governance-change sentiment at `90` or higher costs `6` Political Capital and vents `30` sentiment — unanswered public pressure now boils over on its own instead of waiting for a coup.
@@ -172,6 +190,7 @@ Cleanup resolves in a fixed order: capital-zero checks, protection and pressure 
 - Uprisings are only risked when happiness is below both the family stash and the safe floor of `50`; a triggered check still has a `1 in 2` chance of collapse. A content public never revolts over a full family vault.
 - Recovery then applies to every surviving territory:
   - Production: gain wealth equal to `3` plus `development / 20` (rounded down).
+  - Subsistence floor: a territory that entered recovery below `25` wealth gains an extra `4` wealth. Informal economies keep poor seats out of permanent pass-loops where no action is ever affordable.
   - Stash trickle: if stash is below `25` and wealth is at least `10`, move `2` wealth into stash.
   - Civic regeneration: if happiness is at least `60`, gain `2` Social Capital and `2` Political Capital; regeneration never raises a capital above `150`.
   - Unrest recovery: if happiness is below `70`, gain `4` happiness.
@@ -197,11 +216,11 @@ Major actions are balanced around cost, target damage, and political side effect
 - `Launder` converts `6` stash into `5` Black Budget, moving visible family loot into deniable funds (and reducing uprising exposure, since uprisings compare happiness against stash).
 - `Crackdown` costs `6` Political Capital and turns coercion inward: +10 fear, -6 happiness, -8 governance-change pressure.
 - `GeneralStrike` (Client only) costs `5` wealth and `6` happiness: the overlord loses `5` wealth and `3` Political Capital, and the striking client gains `6` independence sentiment. Requires a living overlord.
-- `Solidarity` (Client only) sends `6` wealth in aid to another client: the target gains `6` happiness and both clients gain `3` independence sentiment.
-- `Invade` costs wealth and armies, marks the target invaded, damages wealth and happiness, raises fear and governance-change pressure, and increases client defiance. Invading a territory protected by another family costs the invader an extra `5` Political Capital and `5` Social Capital in backlash.
-- `Sanction` costs Political Capital, damages target wealth, happiness, and development, and creates governance-change pressure.
+- `Solidarity` (Client only) sends `6` wealth in aid to another client: the target gains `6` happiness and both clients gain `3` independence sentiment. If the target is below `25` wealth, the convoys also deliver `4` wealth in real goods.
+- `Invade` costs wealth and armies, marks the target invaded, loots up to `10` wealth from the target into the invader's treasury (halved to `5` against a fortified target), damages happiness, raises fear and governance-change pressure, and increases client defiance. Invading a territory protected by another family costs the invader an extra `5` Political Capital and `5` Social Capital in backlash.
+- `Sanction` costs Political Capital, damages target wealth, happiness, and development, and creates governance-change pressure. Sanctioning your own client is a legitimacy catastrophe: it requires and costs an extra `12` Social Capital and raises the client's independence sentiment by `8` — the hierarchy exists to protect clients, and everyone notices when it strangles one instead.
 - `Protect` costs wealth and stash, marks a protected relationship lasting `2` cleanup rounds, increases target happiness, reduces target fear, and can raise defiance if the target is another family's client. Protection expires when the `protectionDeal` counter reaches `0`.
-- `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success. A successful coup transfers family control and resets the territory's defiant-majority counter: the new ruling family starts with a fresh grace period. A failed coup rallies the target around the flag: the target gains `5` Political Capital and `4` fear.
+- `Coup` uses Black Budget, Political Capital comparison, governance-change pressure, factional division, fear, and framing to determine success, with a `+0.25` odds bonus against failed states. A successful coup transfers family control and resets the territory's defiant-majority counter: the new ruling family starts with a fresh grace period. A failed coup rallies the target around the flag: the target gains `5` Political Capital and `4` fear.
 - `DebtShakedown` costs Political Capital, converts target wealth into actor wealth, raises target debt, lowers happiness, and creates backlash.
 - `EconomicExploitation` costs Social Capital, extracts wealth and stash value, lowers target development and happiness, and creates backlash.
 
@@ -235,7 +254,7 @@ Stances are secret actions that spend your turn on protection instead of progres
 
 ## Crisis Deck
 
-Crisis cards carry both rules metadata and playtest context. The top card of the crisis deck is public knowledge: everyone sees next round's storm coming and can position for it, so crises are strategic weather rather than random punishment.
+Crisis cards carry both rules metadata and playtest context. The top card of the crisis deck is public knowledge: everyone sees next round's storm coming and can position for it, so crises are strategic weather rather than random punishment. When the deck exhausts and the discard reshuffles, the crisis that just resolved is never placed on top: the same storm cannot strike twice in a row.
 
 - `type` groups the crisis, such as defiance event, resource shock, financial crisis, legitimacy scandal, alignment crisis, or global economic pressure.
 - `targeting` defines who is affected. Current scopes include `all`, `clients`, `defiantClients`, `resourceNeed`, `resourceHolder`, `highestDebt`, and `highestFactionalDivision`.
@@ -267,7 +286,7 @@ The prototype represents negotiation with explicit action hooks so table deals h
 
 - `TributeHoliday` lets an overlord waive one client tribute payment, lowering defiance at wealth cost.
 - `ProtectionDeal` creates a temporary protection relationship and can create realignment pressure when used on another family's client.
-- `ClientRealignment` lets a ready client switch `clientOf` to a new patron when defiance, independence sentiment, or realignment pressure is high enough. The target must belong to a different family's hierarchy: an overlord cannot "realign" its own client to launder away defiance.
+- `ClientRealignment` lets a ready client switch `clientOf` to a new patron when defiance, independence sentiment, or realignment pressure is high enough. The target must belong to a different family's hierarchy: an overlord cannot "realign" its own client to launder away defiance. Failed states are always eligible at half the political cost plus a wealth-funded stabilization package.
 - `RegionalRivalry` lets one regional family damage another regional family's Political Capital and factional stability.
 
 ## Round Timing

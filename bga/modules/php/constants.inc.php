@@ -30,6 +30,8 @@ if (!function_exists('grandarea_objectives')) {
             'headWealthWin' => 400,
             'regionalWealthWin' => 320,
             'regionalPoliticalWin' => 130,
+            'regionalInfluencePolitical' => 140,
+            'regionalInfluenceClients' => 2,
             'clientHappinessWin' => 120,
             'clientDevelopmentWin' => 70,
             'clientIndependenceWin' => 60,
@@ -48,6 +50,8 @@ if (!function_exists('grandarea_recovery')) {
         return array(
             'productionBase' => 3,
             'productionDevelopmentDivisor' => 20,
+            'subsistenceWealthCeiling' => 25,
+            'subsistenceBonus' => 4,
             'stashTrickle' => 2,
             'stashTrickleCeiling' => 25,
             'stashTrickleMinWealth' => 10,
@@ -118,6 +122,40 @@ if (!function_exists('grandarea_legitimacy_crisis')) {
             'threshold' => 90,
             'politicalPenalty' => 6,
             'sentimentRelief' => 30
+        );
+    }
+}
+
+if (!function_exists('grandarea_failed_state')) {
+    /**
+     * Failed-state tuning. Must stay in sync with FAILED_STATE in
+     * frontend/rules.js (the reference engine).
+     */
+    function grandarea_failed_state()
+    {
+        return array(
+            'recoveryWealthFloor' => 10,
+            'neighborGovernancePressure' => 3,
+            'neighborFactionalDivision' => 2,
+            'neighborClientIndependence' => 2,
+            'realignmentCost' => 6,
+            'coupOddsBonus' => 0.25,
+            'stabilizationCost' => 8,
+            'stabilizationAid' => 12
+        );
+    }
+}
+
+if (!function_exists('grandarea_own_client_sanction')) {
+    /**
+     * Own-client sanction backlash. Must stay in sync with
+     * OWN_CLIENT_SANCTION in frontend/rules.js (the reference engine).
+     */
+    function grandarea_own_client_sanction()
+    {
+        return array(
+            'socialCost' => 12,
+            'independenceGain' => 8
         );
     }
 }

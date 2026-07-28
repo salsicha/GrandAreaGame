@@ -32,6 +32,8 @@
   "cleanupRecovery": {
     "productionBase": 3,
     "productionDevelopmentDivisor": 20,
+    "subsistenceWealthCeiling": 25,
+    "subsistenceBonus": 4,
     "stashTrickle": 2,
     "stashTrickleCeiling": 25,
     "stashTrickleMinWealth": 10,
@@ -40,6 +42,20 @@
     "capitalRegenCap": 150,
     "happinessRecovery": 4,
     "happinessRecoveryCeiling": 70
+  },
+  "failedState": {
+    "recoveryWealthFloor": 10,
+    "neighborGovernancePressure": 3,
+    "neighborFactionalDivision": 2,
+    "neighborClientIndependence": 2,
+    "realignmentCost": 6,
+    "coupOddsBonus": 0.25,
+    "stabilizationCost": 8,
+    "stabilizationAid": 12
+  },
+  "ownClientSanction": {
+    "socialCost": 12,
+    "independenceGain": 8
   },
   "defiancePressure": {
     "socialPerClient": 3,

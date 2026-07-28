@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS territories (
   protected TINYINT(1) DEFAULT 0,
   protectedBy VARCHAR(64) NULL,
   sanctioned TINYINT(1) DEFAULT 0,
+  failedState TINYINT(1) DEFAULT 0,
   outcome VARCHAR(16) NULL,
   PRIMARY KEY(game_id, territory_key)
 );

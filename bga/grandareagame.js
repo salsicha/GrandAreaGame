@@ -195,9 +195,11 @@ define([
         }
         // classList, not dojo dom-class: these are SVG elements.
         node.classList.remove('overlay-head', 'overlay-regional', 'overlay-client',
-          'defiant', 'eliminated', 'invaded', 'sanctioned', 'protected');
+          'defiant', 'eliminated', 'invaded', 'sanctioned', 'protected', 'failed-state');
         if (self.isEliminated(data)) {
           node.classList.add('eliminated');
+        } else if (data.failedState) {
+          node.classList.add('failed-state');
         } else if ((parseInt(data.defiance, 10) || 0) > 0) {
           node.classList.add('defiant');
         } else if (data.type === 'Head') {
@@ -354,7 +356,11 @@ define([
       if (action === 'Protect') return this.num(me, 'stash') >= 6 && this.num(me, 'wealth') >= 8;
       if (action === 'ProtectionDeal') return this.num(me, 'stash') >= 4 && this.num(me, 'wealth') >= 6;
       if (action === 'TributeHoliday') return this.num(me, 'wealth') >= 8;
-      if (action === 'ClientRealignment') return this.num(me, 'politicalCapital') >= 12;
+      if (action === 'ClientRealignment') {
+        // Failed states realign at 6 PC plus an 8-wealth stabilization package.
+        if (this.num(me, 'politicalCapital') >= 12) return true;
+        return this.num(me, 'politicalCapital') >= 6 && this.num(me, 'wealth') >= 8;
+      }
       if (action === 'DebtShakedown') return this.num(me, 'politicalCapital') >= 8;
       if (action === 'EconomicExploitation') return this.num(me, 'socialCapital') >= 4;
       if (action === 'MakeExample') return this.num(me, 'socialCapital') >= 10;

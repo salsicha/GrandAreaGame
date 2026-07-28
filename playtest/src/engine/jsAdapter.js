@@ -5,12 +5,12 @@ const ACTION_RULES = {
   Pass: { target: 'self', cost: 'None', effect: 'No effect.', tags: ['safe'] },
   Skim: { target: 'any', cost: 'Target wealth', effect: 'Move 10 target wealth to stash; target happiness -6.', tags: ['economy', 'extraction'] },
   Propaganda: { target: 'any', cost: '8 stash', effect: 'Target happiness +10.', tags: ['happiness', 'public-order'] },
-  Invade: { target: 'other', cost: '12 wealth, 1 army, backlash', effect: 'Target invaded, wealth -10, happiness loss, fear +10.', tags: ['military', 'coercion'] },
-  Sanction: { target: 'other', cost: '5 Political Capital', effect: 'Target wealth, happiness, and development fall.', tags: ['economy', 'coercion'] },
+  Invade: { target: 'other', cost: '12 wealth, 1 army, backlash', effect: 'Target invaded and looted (up to 10 wealth seized), happiness loss, fear +10.', tags: ['military', 'coercion'] },
+  Sanction: { target: 'other', cost: '5 Political Capital (+12 Social Capital vs own client)', effect: 'Target wealth, happiness, and development fall. Sanctioning your own client adds independence +8.', tags: ['economy', 'coercion'] },
   Protect: { target: 'other', cost: '8 wealth, 6 stash', effect: 'Target protected, happiness +8, fear reduced.', tags: ['protection', 'relationship'] },
   TributeHoliday: { target: 'controlledClient', cost: '8 wealth', effect: 'Client skips one tribute and loses 1 defiance.', tags: ['client-management'] },
   ProtectionDeal: { target: 'other', cost: '6 wealth, 4 stash', effect: 'Temporary protection; rival clients gain realignment pressure.', tags: ['relationship', 'realignment'] },
-  ClientRealignment: { target: 'eligibleRivalClient', cost: '12 Political Capital, 4 Social Capital', effect: 'Eligible rival client switches patron.', tags: ['relationship', 'realignment'] },
+  ClientRealignment: { target: 'eligibleRivalClient', cost: '12 Political Capital, 4 Social Capital (failed states: 6 PC + 8 wealth stabilization)', effect: 'Eligible rival client switches patron. Failed states are always eligible and receive +12 wealth aid.', tags: ['relationship', 'realignment'] },
   RegionalRivalry: { target: 'regionalOther', cost: '6 Political Capital', effect: 'Rival loses Political Capital and gains factional division.', tags: ['regional', 'competition'] },
   DebtShakedown: { target: 'other', cost: '8 Political Capital', effect: 'Extract up to 20 wealth and add target debt.', tags: ['economy', 'debt'] },
   EconomicExploitation: { target: 'other', cost: '4 Social Capital', effect: 'Extract wealth and stash; target development and happiness fall.', tags: ['economy', 'extraction'] },
@@ -27,7 +27,7 @@ const ACTION_RULES = {
   Launder: { target: 'self', cost: '6 stash', effect: 'Convert stash into 5 Black Budget.', tags: ['covert', 'economy'] },
   Crackdown: { target: 'self', cost: '6 Political Capital', effect: 'Fear +10, happiness -6, governance pressure -8.', tags: ['coercion', 'domestic'] },
   GeneralStrike: { target: 'self', cost: '5 wealth, 6 happiness', effect: 'Client only: overlord loses 5 wealth and 3 Political Capital; own independence +6.', tags: ['defiance', 'client'] },
-  Solidarity: { target: 'otherClient', cost: '6 wealth', effect: 'Client only: another client gains 6 happiness; both gain 3 independence.', tags: ['client', 'happiness'] }
+  Solidarity: { target: 'otherClient', cost: '6 wealth', effect: 'Client only: another client gains 6 happiness; both gain 3 independence. Targets below 25 wealth also gain 4 wealth.', tags: ['client', 'happiness'] }
 };
 
 const ACTIONS = Object.keys(ACTION_RULES);
@@ -93,7 +93,10 @@ function isActionLegal(rules, state, actor, action) {
     case 'Protect': return (data.stash || 0) >= 6 && (data.wealth || 0) >= 8;
     case 'TributeHoliday': return (data.wealth || 0) >= 8;
     case 'ProtectionDeal': return (data.stash || 0) >= 4 && (data.wealth || 0) >= 6;
-    case 'ClientRealignment': return (data.politicalCapital || 0) >= 12;
+    // Failed states realign at 6 PC plus an 8-wealth stabilization package; the
+    // target filter below narrows discount-only actors to failed targets.
+    case 'ClientRealignment': return (data.politicalCapital || 0) >= 12
+      || ((data.politicalCapital || 0) >= 6 && (data.wealth || 0) >= 8);
     case 'RegionalRivalry': return data.type === 'Regional' && (data.politicalCapital || 0) >= 6;
     case 'DebtShakedown': return (data.politicalCapital || 0) >= 8;
     case 'EconomicExploitation': return (data.socialCapital || 0) >= 4;
@@ -148,6 +151,12 @@ function targetKeysForAction(state, actor, action) {
     return others.filter(key => {
       const target = state.territories[key];
       if (target.type !== 'Client' || target.clientOf === actorData.family) return false;
+      // Failed states are always eligible but need the discount affordability
+      // (6 PC + 8 wealth); regular targets need the full 12 PC.
+      if (target.failedState) {
+        return (actorData.politicalCapital || 0) >= 6 && (actorData.wealth || 0) >= 8;
+      }
+      if ((actorData.politicalCapital || 0) < 12) return false;
       return (target.defiance || 0) > 0
         || (target.independenceSentiment || 0) >= 50
         || (target.realignmentPressure || 0) >= 8;
@@ -156,6 +165,15 @@ function targetKeysForAction(state, actor, action) {
   if (rule.target === 'regionalOther') return others.filter(key => state.territories[key].type === 'Regional');
   if (rule.target === 'otherClient') return others.filter(key => state.territories[key].type === 'Client');
   return ['Self'];
+}
+
+// Failed states cannot be extracted from: mirror the engine's guards so the
+// harness never enumerates a doomed extraction.
+const FAILED_STATE_EXTRACTION_ACTIONS = new Set(['Skim', 'DebtShakedown', 'EconomicExploitation']);
+
+function filterFailedStateTargets(state, action, keys) {
+  if (!FAILED_STATE_EXTRACTION_ACTIONS.has(action)) return keys;
+  return keys.filter(key => key === 'Self' || !(state.territories[key] || {}).failedState);
 }
 
 function framingOptionsFor(state, actor, action) {
@@ -216,8 +234,13 @@ class JavaScriptGameAdapter {
     let drawPile = deck.drawPile.slice();
     let discard = deck.discard.slice();
     if (drawPile.length === 0 && discard.length > 0) {
+      const lastResolved = discard[discard.length - 1];
       drawPile = seededShuffle(discard, this.rules.createSeededRandom(reshuffleSeed));
       discard = [];
+      // Never let the crisis that just resolved come straight back up.
+      if (drawPile.length > 1 && drawPile[0] === lastResolved) {
+        drawPile.push(drawPile.shift());
+      }
     }
     const nextId = drawPile.shift() || null;
     if (nextId) discard.push(nextId);
@@ -323,7 +346,7 @@ class JavaScriptGameAdapter {
   listLegalActions(state, actor) {
     const legal = [];
     ACTIONS.filter(action => isActionLegal(this.rules, state, actor, action)).forEach(action => {
-      targetKeysForAction(state, actor, action).forEach(target => {
+      filterFailedStateTargets(state, action, targetKeysForAction(state, actor, action)).forEach(target => {
         framingOptionsFor(state, actor, action).forEach(framing => {
           const rule = ACTION_RULES[action];
           const id = `A${String(legal.length + 1).padStart(3, '0')}`;

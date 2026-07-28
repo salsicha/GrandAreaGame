@@ -131,8 +131,13 @@ class GrandAreaGame extends Table
         $discard = $this->loadRuntime('crisis_discard', array());
         $cardId = array_shift($draw);
         if ($cardId === null && count($discard) > 0) {
+            $lastResolved = $discard[count($discard) - 1];
             $draw = $this->shuffleIdsFromIds($discard, $this->seedFor('crisis-reshuffle'));
             $discard = array();
+            // Never let the crisis that just resolved come straight back up.
+            if (count($draw) > 1 && $draw[0] === $lastResolved) {
+                $draw[] = array_shift($draw);
+            }
             $cardId = array_shift($draw);
         }
 
@@ -939,6 +944,7 @@ class GrandAreaGame extends Table
             $row['protected'] = intval($row['protected']) === 1;
             $row['invaded'] = intval($row['invaded']) === 1;
             $row['sanctioned'] = intval($row['sanctioned']) === 1;
+            $row['failedState'] = intval($row['failedState']) === 1;
             $state[$key] = $row;
         }
         return $state;
@@ -987,6 +993,7 @@ class GrandAreaGame extends Table
             'protected' => $this->truthy($this->value($data, 'protected', false)),
             'protectedBy' => $this->nullableSqlString($this->value($data, 'protectedBy', null)),
             'sanctioned' => $this->truthy($this->value($data, 'sanctioned', false)),
+            'failedState' => $this->truthy($this->value($data, 'failedState', false)),
             'outcome' => $this->nullableSqlString($this->value($data, 'outcome', null))
         );
 

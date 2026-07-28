@@ -5,7 +5,7 @@
     "host": "http://127.0.0.1:11434",
     "model": "qwen3.6",
     "temperature": 0.1,
-    "timeoutMs": 120000,
+    "timeoutMs": 420000,
     "maxRetries": 1,
     "keepAlive": "30m"
   },
@@ -45,15 +45,45 @@
     }
   },
   "seatAssignments": [
-    { "actor": "NorthAmerica", "agentId": "head-qwen-optimizer" },
-    { "actor": "WesternEurope", "agentId": "regional-qwen-optimizer" },
-    { "actor": "MiddleEast", "agentId": "regional-qwen-optimizer" },
-    { "actor": "SouthAsia", "agentId": "regional-qwen-optimizer" },
-    { "actor": "EastAsia", "agentId": "regional-qwen-optimizer" },
-    { "actor": "LatinAmerica", "agentId": "client-qwen-novice" },
-    { "actor": "EasternEurope", "agentId": "client-qwen-novice" },
-    { "actor": "NorthAfrica", "agentId": "client-qwen-exploit" },
-    { "actor": "SubSaharanAfrica", "agentId": "client-qwen-exploit" },
-    { "actor": "Oceania", "agentId": "client-qwen-novice" }
+    {
+      "actor": "NorthAmerica",
+      "agentId": "head-qwen-optimizer"
+    },
+    {
+      "actor": "WesternEurope",
+      "agentId": "regional-qwen-optimizer"
+    },
+    {
+      "actor": "MiddleEast",
+      "agentId": "regional-qwen-optimizer"
+    },
+    {
+      "actor": "SouthAsia",
+      "agentId": "regional-qwen-optimizer"
+    },
+    {
+      "actor": "EastAsia",
+      "agentId": "regional-qwen-optimizer"
+    },
+    {
+      "actor": "LatinAmerica",
+      "agentId": "client-qwen-novice"
+    },
+    {
+      "actor": "EasternEurope",
+      "agentId": "client-qwen-novice"
+    },
+    {
+      "actor": "NorthAfrica",
+      "agentId": "client-qwen-exploit"
+    },
+    {
+      "actor": "SubSaharanAfrica",
+      "agentId": "client-qwen-exploit"
+    },
+    {
+      "actor": "Oceania",
+      "agentId": "client-qwen-novice"
+    }
   ]
 }
