@@ -26,6 +26,8 @@ Install PHP for BGA syntax checks:
 brew install php
 ```
 
+The suite includes PHP server regression tests when PHP is available. To use a PHP binary outside your PATH, set `GRANDAREA_PHP=/path/to/php`.
+
 Run the test suite:
 
 ```bash

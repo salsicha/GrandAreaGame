@@ -4,6 +4,8 @@ This folder contains a push-button automated playtest harness based on `INSTRUCT
 
 The first implementation uses the existing deterministic JavaScript rules engine in `frontend/rules.js`, enumerates legal action IDs, gives each player agent only an observation plus legal choices, validates every selected ID, resolves the round through the authoritative engine adapter, checks invariants, and writes replayable JSON Lines episode logs.
 
+Decision states are prepared after tribute has been collected, so observations and legal choices use the same balances as BGA action submission. Tribute is collected once per round, including the first round, and its events remain in the episode trace.
+
 Each round the adapter draws one crisis card from a seeded shuffle of `frontend/data/crisis.json` (discarding after resolution and reshuffling the discard pile when the draw pile empties), applies it through the engine, and surfaces the drawn card in observations and recent events.
 
 ## One-time local setup

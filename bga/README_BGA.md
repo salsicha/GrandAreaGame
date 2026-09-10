@@ -11,7 +11,7 @@ This folder is a complete Board Game Arena Studio project laid out in BGA's requ
 5. Players reveal payload plus nonce through `reveal`; the server recomputes the commit hash, validates action, target, phase (via `checkAction`), and family ownership, and marks the player done with the phase.
 6. `stResolution()` gathers revealed payloads and calls `GrandAreaRules::resolveTurn()`, which runs the full pipeline in the reference-engine order: crisis application, actions, unanswered-defiance pressure, objective evaluation, defiance contagion, and a final objective pass. The applied crisis card moves to the discard and the round's submissions are deleted.
 7. `stCleanup()` calls `GrandAreaRules::resolveCleanup()` (capital checks, uprising, counter decay, protection expiry, resource-shortage pressure, sentiment growth, comeback pressure, objectives), persists outcomes, and advances the round.
-8. Both resolution and cleanup check for game end (any `Won` outcome, all but one player eliminated, or the round limit from the "Game length" option reached — 12/20/30 rounds). Objective winners score `1000 + wealth`, other survivors score their family wealth, eliminated players score `0`; `player_score_aux` carries wealth as the tiebreak. The round limit guarantees every game terminates.
+8. Both resolution and cleanup check for game end (a `Won` outcome belonging to a participating family, all but one player eliminated, or the round limit from the "Game length" option reached — 12/20/30 rounds). Objective winners score `1000 + wealth`, other survivors score their family wealth, eliminated players score `0`; `player_score_aux` carries wealth as the tiebreak. The round limit guarantees every game terminates.
 
 ## Determinism And Seeds
 
@@ -26,6 +26,9 @@ This folder is a complete Board Game Arena Studio project laid out in BGA's requ
 - `player_state.hand_json` stores each player's private hand; `getAllDatas()` returns only hand counts for opponents and the full hand for the requesting player.
 - `player_state.agenda_id` stores each player's secret agenda; `getAllDatas()` returns only the requesting player's own agenda, and agendas are revealed to everyone in the `gameEnded` summary with their fulfilled/unfulfilled status and the 150-point bonus applied to surviving players' scores.
 - `game_runtime` stores deck order, discards, the current crisis, the secret salt, and revealed payload audit data.
+- Public snapshots and all territory notifications omit Black Budget. Each player receives a private snapshot with the budgets of their currently owned territories; spectators receive only public state. The inspector labels concealed budgets as hidden.
+- Tribute and card plays publish updated territory state immediately, keeping the board and action choices current.
+- Revealed actions identify their player and acting territory, target, and framing spend in the client log.
 - Public notifications never include unrevealed hand contents or unrevealed payloads.
 
 ## Material

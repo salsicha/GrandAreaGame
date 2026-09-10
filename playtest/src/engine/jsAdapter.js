@@ -225,7 +225,20 @@ class JavaScriptGameAdapter {
       crisisDeck: { drawPile, discard: [] },
       crisis: null
     };
-    this.drawCrisis(state, `${seed}:crisis-reshuffle:setup`);
+    this.beginRound(state, `${seed}:crisis-reshuffle:setup`);
+    return state;
+  }
+
+  // Decision states are always after tribute, matching BGA's submission phase.
+  beginRound(state, reshuffleSeed) {
+    this.drawCrisis(state, reshuffleSeed);
+    const tribute = this.rules.resolveTribute(state.territories);
+    state.territories = tribute.newState;
+    state.roundStartLogs = state.crisis
+      ? [`Crisis drawn for round ${state.round}: ${state.crisis.id} (${state.crisis.title})`]
+      : [];
+    state.roundStartLogs.push(...tribute.logs);
+    state.recentEvents = state.recentEvents.concat(salientEvents(state.roundStartLogs, state.round)).slice(-MAX_RECENT_EVENTS);
     return state;
   }
 
@@ -374,15 +387,13 @@ class JavaScriptGameAdapter {
       framing: action.parameters && action.parameters.framing || 0
     }));
     const beforeHash = this.hashState(state);
-    const logs = [];
+    const logs = (state.roundStartLogs || []).slice();
     const crisis = state.crisis ? clone(state.crisis) : null;
-    if (crisis) logs.push(`Crisis drawn for round ${state.round}: ${crisis.id} (${crisis.title})`);
-    const tribute = this.rules.resolveTribute(state.territories);
-    const actionInput = { ...tribute.newState };
+    const actionInput = { ...state.territories };
     if (crisis) actionInput.crisis = crisis;
     const resolved = this.rules.resolveTurn(actionInput, chosen, { seed: `${seed}:actions` });
     const cleanup = this.rules.resolveCleanup(resolved.newState, { seed: `${seed}:cleanup` });
-    logs.push(...tribute.logs, ...resolved.logs, ...cleanup.logs);
+    logs.push(...resolved.logs, ...cleanup.logs);
     const nextState = {
       ...state,
       round: state.round + 1,
@@ -391,9 +402,10 @@ class JavaScriptGameAdapter {
     };
     if (this.isTerminal(nextState)) {
       nextState.crisis = null;
+      nextState.roundStartLogs = [];
       nextState.phase = 'complete';
     } else {
-      this.drawCrisis(nextState, `${seed}:crisis-reshuffle`);
+      this.beginRound(nextState, `${seed}:crisis-reshuffle`);
       nextState.phase = 'secret-action';
     }
     return {

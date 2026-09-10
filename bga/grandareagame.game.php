@@ -174,7 +174,7 @@ class GrandAreaGame extends Table
             }
         }
 
-        self::notifyAllPlayers('tributeResolved', '', array('logs' => $result['logs']));
+        $this->notifyTerritoryState('tributeResolved', $result['newState'], array('logs' => $result['logs']));
         $this->gamestate->nextState('next');
     }
 
@@ -223,9 +223,8 @@ class GrandAreaGame extends Table
         $seed = $this->seedFor('cleanup');
         $cleanup = GrandAreaRules::resolveCleanup($this->loadTerritoryState(), $seed);
         $this->persistTerritoryState($cleanup['newState']);
-        self::notifyAllPlayers('cleanupResolved', '', array(
-            'logs' => $cleanup['logs'],
-            'territories' => $cleanup['newState']
+        $this->notifyTerritoryState('cleanupResolved', $cleanup['newState'], array(
+            'logs' => $cleanup['logs']
         ));
 
         self::incStat(1, 'rounds_played');
@@ -320,7 +319,12 @@ class GrandAreaGame extends Table
 
         self::notifyAllPlayers('playerRevealed', '', array(
             'player_id' => $playerId,
-            'action' => array('action' => $validated['action'], 'target' => $validated['target'])
+            'action' => array(
+                'family' => $validated['family'],
+                'action' => $validated['action'],
+                'target' => $validated['target'],
+                'framing' => $validated['framing']
+            )
         ));
 
         // A revealed player is done with the reveal phase.
@@ -379,7 +383,7 @@ class GrandAreaGame extends Table
 
         self::incStat(1, 'cards_played', $playerId);
 
-        self::notifyAllPlayers('cardPlayed', '', array(
+        $this->notifyTerritoryState('cardPlayed', $result['newState'], array(
             'player_id' => $playerId,
             'card_id' => $cardId,
             'target' => $targetKey,
@@ -549,11 +553,10 @@ class GrandAreaGame extends Table
         // Submissions are consumed: clear them so nothing stale re-executes.
         self::DbQuery("DELETE FROM secret_submissions WHERE game_id = " . $gameId);
 
-        self::notifyAllPlayers('roundResolved', '', array(
+        $this->notifyTerritoryState('roundResolved', $resolution['newState'], array(
             'seed_checksum' => sprintf('%u', crc32($seed)),
             'crisis_id' => $crisisId,
-            'resolution_logs' => $resolution['logs'],
-            'territories' => $resolution['newState']
+            'resolution_logs' => $resolution['logs']
         ));
 
         return $resolution['newState'];
@@ -564,7 +567,7 @@ class GrandAreaGame extends Table
     // ------------------------------------------------------------------
 
     /**
-     * Ends the game when any territory has a Won outcome, when at most one
+     * Ends the game when a participating family has a Won outcome, when at most one
      * player still controls a surviving territory, or when $force is set
      * (round limit reached). Scores: objective winners 1000 + wealth,
      * other survivors their family wealth, eliminated players 0;
@@ -574,13 +577,6 @@ class GrandAreaGame extends Table
     {
         $gameId = $this->gameId();
         $anyWon = false;
-        foreach ($state as $data) {
-            if (isset($data['outcome']) && $data['outcome'] === 'Won') {
-                $anyWon = true;
-                break;
-            }
-        }
-
         $players = self::getObjectListFromDB(
             "SELECT player_id, family_name, agenda_id FROM player_state WHERE game_id = " . $gameId
         );
@@ -598,6 +594,7 @@ class GrandAreaGame extends Table
                 $wealth += isset($data['wealth']) ? intval($data['wealth']) : 0;
                 if (isset($data['outcome']) && $data['outcome'] === 'Won') {
                     $won = true;
+                    $anyWon = true;
                 }
                 if (!GrandAreaRules::isEliminated($data)) {
                     $surviving = true;
@@ -657,6 +654,28 @@ class GrandAreaGame extends Table
     // Framework data providers
     // ------------------------------------------------------------------
 
+    /** Public snapshots omit Black Budget; owners see only their own holdings. */
+    private function territoryStateForFamily($state, $family = null)
+    {
+        foreach ($state as $key => $data) {
+            if ($family === null || !isset($data['family']) || $data['family'] !== $family) {
+                unset($state[$key]['blackBudget']);
+            }
+        }
+        return $state;
+    }
+
+    private function notifyTerritoryState($type, $state, $args)
+    {
+        $args['territories'] = $this->territoryStateForFamily($state);
+        self::notifyAllPlayers($type, '', $args);
+        foreach ($this->playerIdsByFamily() as $family => $playerId) {
+            self::notifyPlayer($playerId, 'privateTerritories', '', array(
+                'territories' => $this->territoryStateForFamily($state, $family)
+            ));
+        }
+    }
+
     protected function getAllDatas()
     {
         $gameId = $this->gameId();
@@ -668,7 +687,8 @@ class GrandAreaGame extends Table
         );
         $result['round'] = intval(self::getGameStateValue('round_number'));
         $result['round_limit'] = $this->roundLimit();
-        $result['territories'] = $this->loadTerritoryState();
+        $state = $this->loadTerritoryState();
+        $result['territories'] = $this->territoryStateForFamily($state);
         $result['current_crisis'] = $this->loadRuntime('current_crisis', null);
         $crisisId = $result['current_crisis'];
         $result['current_crisis_card'] = $crisisId !== null ? $this->crisisCardById($crisisId) : null;
@@ -697,6 +717,7 @@ class GrandAreaGame extends Table
             $result['families'][$playerId] = $row['family_name'];
             $result['hand_counts'][$playerId] = count($hand);
             if ($playerId === $currentPlayerId) {
+                $result['territories'] = $this->territoryStateForFamily($state, $row['family_name']);
                 $result['hand'] = $hand;
                 if (isset($row['agenda_id']) && $row['agenda_id'] !== null) {
                     $result['agenda'] = $this->agendaDefById($row['agenda_id']);

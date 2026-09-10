@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed five review findings: Black Budget is filtered from public BGA state and sent privately to current owners; tribute and card plays refresh the board immediately; unassigned families cannot trigger game end; playtest choices use post-tribute balances; revealed actions identify their player, acting territory, target, and framing. Added executable PHP server and JavaScript client/adapter regression tests.
+
 - Failed states + first-playtest fixes (from a full 12-round, 10-seat playtest of the previous build):
   - **Failed states**: a client whose wealth hits 0 becomes a failed state instead of dying. It pays no tribute, cannot be Skimmed/DebtShakedown'd/Exploited ("nothing left to extract"), and every cleanup radiates instability into its neighbors (+3 governance pressure, +2 factional division, clients +2 independence). It is an easy sphere-of-influence target: ClientRealignment against it is always eligible at 6 Political Capital (half price) plus an 8-wealth stabilization package that delivers +12 wealth to the target, and coups against it get +0.25 success odds. Rebuilding to 10+ wealth restores normal play. Bleeding a client dry now hands rivals a cheap acquisition on your border instead of deleting a player.
   - **Subsistence floor**: territories entering recovery below 25 wealth gain +4 extra wealth, ending the client poverty-lock where poor seats could only Pass for the back half of the game. `Solidarity` to a target below 25 wealth also delivers +4 wealth in goods.

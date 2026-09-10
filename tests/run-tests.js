@@ -1421,16 +1421,23 @@ test('no seat can win on the first round from the starting setup', () => {
   }
 });
 
-if (commandExists('php')) {
+const phpCommand = process.env.GRANDAREA_PHP || 'php';
+if (commandExists(phpCommand)) {
   test('BGA PHP files pass syntax lint', () => {
-    const phpFiles = listFilesRecursive('bga', file => file.endsWith('.php'));
+    const phpFiles = listFilesRecursive('bga', file => file.endsWith('.php')).concat(['tests/bga-server-tests.php']);
     assert.ok(phpFiles.length > 0, 'expected PHP files in bga/');
     for (const file of phpFiles) {
-      const result = runCommand('php', ['-l', file]);
+      const result = runCommand(phpCommand, ['-l', file]);
       assert.equal(result.status, 0, result.stderr || result.stdout);
     }
   });
+  test('BGA server privacy notifications scoring and reveals', () => {
+    const result = runCommand(phpCommand, ['tests/bga-server-tests.php']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Only participating winners/);
+  });
 } else {
+  skip('BGA server privacy notifications scoring and reveals', 'php command is not installed');
   skip('BGA PHP files pass syntax lint', 'php command is not installed');
 }
 
@@ -1445,7 +1452,8 @@ test('lightweight lint and format checks pass for source files', () => {
     'TODO.md',
     'CHANGELOG.md',
     'package.json',
-    'tests/run-tests.js'
+    'tests/run-tests.js',
+    'tests/bga-server-tests.php'
   ];
 
   for (const file of sourceFiles) {
@@ -1782,6 +1790,119 @@ test('BGA board template embeds the world map safely', () => {
     assert.ok(tpl.includes(`data-country="${key}"`), `template missing region ${key}`);
   }
   assert.doesNotMatch(tpl, /<style>/, 'inline <style> blocks break the BGA template engine');
+});
+
+function loadBgaClient(nodes = {}) {
+  let methods;
+  const subscriptions = {};
+  const context = {
+    _: text => text,
+    ebg: { core: { gamegui: {} } },
+    define: (dependencies, factory) => {
+      methods = factory({
+        byId: id => nodes[id] || null,
+        query: () => [],
+        subscribe: (event, receiver, handler) => { subscriptions[event] = args => receiver[handler]({ args }); }
+      }, (name, base, implementation) => implementation);
+    }
+  };
+  vm.runInNewContext(readText('bga', 'grandareagame.js'), context, { filename: 'bga/grandareagame.js' });
+  const client = Object.create(methods);
+  client.constructor();
+  client.gamedatas = { players: { 1: { name: 'Alice' } }, families: { 1: 'USA' } };
+  client.logLine = () => {};
+  client.setupNotifications();
+  return { client, subscriptions };
+}
+
+test('BGA notifications refresh balances affordability and private visibility', () => {
+  const panel = { innerHTML: '' };
+  const { client, subscriptions } = loadBgaClient({ grandarea_selected: panel });
+  client.myFamily = 'USA';
+  client.selectedTerritory = 'NorthAmerica';
+  let canInvade;
+  let canCoup;
+  client.populateActionSelect = () => {
+    const me = client.territories[client.myActorKey()];
+    canInvade = client.isActionAffordable('Invade', me);
+    canCoup = client.isActionAffordable('Coup', me);
+  };
+  const publicState = { NorthAmerica: territory({ family: 'USA', wealth: 10 }) };
+  delete publicState.NorthAmerica.blackBudget;
+  subscriptions.tributeResolved({ territories: publicState });
+  assert.equal(client.territories.NorthAmerica.wealth, 10);
+  assert.equal(canInvade, false);
+  assert.match(panel.innerHTML, /Black Budget<\/td><td>Hidden/);
+
+  const ownState = { NorthAmerica: { ...publicState.NorthAmerica, blackBudget: 12 } };
+  subscriptions.privateTerritories({ territories: ownState });
+  assert.equal(canCoup, true);
+  assert.match(panel.innerHTML, /Black Budget<\/td><td>12/);
+
+  subscriptions.cardPlayed({ territories: { NorthAmerica: { ...publicState.NorthAmerica, wealth: 20 } } });
+  assert.equal(canInvade, true);
+  assert.equal('blackBudget' in client.territories.NorthAmerica, false, 'Public refresh must remove stale private values');
+  assert.match(panel.innerHTML, /Wealth<\/td><td>20/);
+
+  // A real zero budget must remain distinguishable from an opponent's hidden one.
+  subscriptions.privateTerritories({ territories: { NorthAmerica: { ...publicState.NorthAmerica, blackBudget: 0 } } });
+  assert.equal(canCoup, false);
+  assert.match(panel.innerHTML, /Black Budget<\/td><td>0/);
+});
+
+test('BGA reveal log identifies the player acting territory target and framing', () => {
+  const { client, subscriptions } = loadBgaClient();
+  const logs = [];
+  client.logLine = line => logs.push(line);
+  subscriptions.playerRevealed({ player_id: 1, action: { family: 'NorthAmerica', action: 'Invade', target: 'EastAsia', framing: 5 } });
+  assert.equal(logs[0], 'Alice (NorthAmerica) revealed: Invade -> EastAsia (framing 5)');
+  // Notifications saved before actor/framing fields were added still identify the player.
+  subscriptions.playerRevealed({ player_id: 1, action: { action: 'Pass', target: 'NorthAmerica' } });
+  assert.match(logs[1], /^Alice \(USA\) revealed: Pass/);
+});
+
+test('playtest decisions see post-tribute wealth and do not pay tribute twice', () => {
+  const { JavaScriptGameAdapter } = require('../playtest/src/engine/jsAdapter');
+  const adapter = new JavaScriptGameAdapter({ maxRounds: 1 });
+  let state = adapter.createInitialState({}, 'tribute-review');
+  assert.equal(state.territories.LatinAmerica.wealth, 84);
+  assert.equal(state.territories.NorthAmerica.wealth, 243);
+  assert.ok(adapter.getObservation(state, 'LatinAmerica').recentEvents.some(event => event.summary.includes('pays 21 tribute')));
+
+  // Reproduce the affordability boundary with no crisis or other actors.
+  state.territories = readJson('frontend', 'data', 'territories.json');
+  state.territories.LatinAmerica.wealth = 12;
+  state.crisisDeck = { drawPile: [], discard: [] };
+  adapter.beginRound(state, 'no-crisis');
+  assert.equal(adapter.getObservation(state, 'LatinAmerica').publicState.territories.LatinAmerica.wealth, 10);
+  const legal = adapter.listLegalActions(state, 'LatinAmerica');
+  assert.ok(!legal.some(action => action.type === 'Invade'));
+  const develop = legal.find(action => action.type === 'Develop');
+  assert.ok(develop, 'Develop should still be affordable at 10 wealth');
+  const before = JSON.stringify(state);
+  const result = adapter.advance(state, new Map([['LatinAmerica', develop]]), 'tribute-review');
+  assert.ok(result.logs.some(line => line.includes('LatinAmerica invested in development')));
+  assert.ok(!result.logs.some(line => line.includes('failed Develop')));
+  assert.equal(JSON.stringify(state), before, 'Advancing mutated the decision state');
+  assert.equal(result.state.phase, 'complete');
+});
+
+test('playtest collects tribute before every next decision and preserves seeded replay', () => {
+  const { JavaScriptGameAdapter } = require('../playtest/src/engine/jsAdapter');
+  const adapter = new JavaScriptGameAdapter({ maxRounds: 3 });
+  let state = adapter.createInitialState({}, 'rounds-review');
+  for (let round = 1; round <= 3; round += 1) {
+    state.crisis = null;
+    const seed = `rounds-review:${round}`;
+    const resolved = adapter.rules.resolveTurn(state.territories, [], { seed: `${seed}:actions` });
+    const cleanup = adapter.rules.resolveCleanup(resolved.newState, { seed: `${seed}:cleanup` });
+    const expected = round < 3 ? adapter.rules.resolveTribute(cleanup.newState).newState : cleanup.newState;
+    const transition = adapter.advance(state, new Map(), seed);
+    assert.deepEqual(JSON.parse(JSON.stringify(transition.state.territories)), JSON.parse(JSON.stringify(expected)));
+    const replay = adapter.advance(adapter.cloneState(state), new Map(), seed);
+    assert.equal(adapter.hashState(transition.state), adapter.hashState(replay.state));
+    state = transition.state;
+  }
 });
 
 test('a zero-wealth client becomes a failed state, pays no tribute, and recovers with wealth', () => {

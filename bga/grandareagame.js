@@ -241,7 +241,8 @@ define([
       for (var i = 0; i < STAT_FIELDS.length; i++) {
         var field = STAT_FIELDS[i][0];
         html += '<tr><td>' + this.escapeText(STAT_FIELDS[i][1]) + '</td><td>'
-          + this.escapeText(String(data[field] != null ? data[field] : 0)) + '</td></tr>';
+          + this.escapeText(field === 'blackBudget' && data[field] == null
+            ? _('Hidden') : String(data[field] != null ? data[field] : 0)) + '</td></tr>';
       }
       if (data.outcome) {
         html += '<tr><td>Outcome</td><td>' + this.escapeText(data.outcome) + '</td></tr>';
@@ -723,6 +724,7 @@ define([
     setupNotifications: function() {
       dojo.subscribe('crisisDrawn', this, 'notif_crisisDrawn');
       dojo.subscribe('tributeResolved', this, 'notif_tributeResolved');
+      dojo.subscribe('privateTerritories', this, 'notif_privateTerritories');
       dojo.subscribe('actionSubmissionOpen', this, 'notif_actionSubmissionOpen');
       dojo.subscribe('revealOpen', this, 'notif_revealOpen');
       dojo.subscribe('narrativeBattle', this, 'notif_narrativeBattle');
@@ -749,6 +751,11 @@ define([
 
     notif_tributeResolved: function(notif) {
       this.logLines(notif.args.logs || []);
+      this.applyTerritoryUpdate(notif.args.territories);
+    },
+
+    notif_privateTerritories: function(notif) {
+      this.applyTerritoryUpdate(notif.args.territories);
     },
 
     notif_actionSubmissionOpen: function(notif) {
@@ -776,8 +783,14 @@ define([
 
     notif_playerRevealed: function(notif) {
       var action = notif.args.action || {};
-      this.logLine('A player revealed: ' + (action.action || 'Pass')
-        + (action.target ? ' -> ' + action.target : ''));
+      var playerId = notif.args.player_id;
+      var player = (this.gamedatas.players || {})[playerId];
+      var family = (this.gamedatas.families || {})[playerId];
+      var actor = action.family || family;
+      var name = player && player.name ? player.name : (family || 'Player ' + playerId);
+      this.logLine(name + (actor ? ' (' + actor + ')' : '') + ' revealed: ' + (action.action || 'Pass')
+        + (action.target ? ' -> ' + action.target : '')
+        + ' (framing ' + (parseInt(action.framing, 10) || 0) + ')');
     },
 
     notif_playerEndedTurn: function(notif) {
@@ -786,6 +799,7 @@ define([
 
     notif_cardPlayed: function(notif) {
       this.logLines(notif.args.logs || []);
+      this.applyTerritoryUpdate(notif.args.territories);
     },
 
     notif_handUpdate: function(notif) {
