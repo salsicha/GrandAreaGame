@@ -119,7 +119,8 @@ function isActionLegal(rules, state, actor, action) {
     }
     case 'Launder': return (data.stash || 0) >= 6;
     case 'Crackdown': return (data.politicalCapital || 0) >= 6;
-    case 'GeneralStrike': return data.type === 'Client' && (data.wealth || 0) >= 5;
+    case 'GeneralStrike': return data.type === 'Client' && (data.wealth || 0) >= 5
+      && territoryKeys(state).some(key => state.territories[key].family === data.clientOf && !isEliminated(state.territories[key]));
     case 'Solidarity': return data.type === 'Client' && (data.wealth || 0) >= 6;
     default: return false;
   }
@@ -134,7 +135,9 @@ function targetKeysForAction(state, actor, action) {
   const others = territoryKeys(state).filter(key => key !== actor && !isEliminated(state.territories[key]));
   if (rule.target === 'self') return ['Self'];
   if (rule.target === 'any') return ['Self'].concat(others);
-  if (rule.target === 'other') return others;
+  if (rule.target === 'other') return others.filter(key => action !== 'Sanction'
+    || state.territories[key].type !== 'Client' || state.territories[key].clientOf !== actorData.family
+    || (actorData.socialCapital || 0) >= 12);
   if (rule.target === 'controlledClient') {
     return others.filter(key => {
       const target = state.territories[key];
@@ -225,6 +228,8 @@ class JavaScriptGameAdapter {
       crisisDeck: { drawPile, discard: [] },
       crisis: null
     };
+    // Seat IDs stay stable even when their original territory changes hands.
+    state.players = Object.fromEntries(territoryKeys(state).map(key => [key, state.territories[key].family]));
     this.beginRound(state, `${seed}:crisis-reshuffle:setup`);
     return state;
   }
@@ -268,11 +273,18 @@ class JavaScriptGameAdapter {
 
   getPendingActors(state) {
     if (this.isTerminal(state)) return [];
-    return territoryKeys(state).filter(key => !isEliminated(state.territories[key]));
+    return Object.keys(state.players).filter(player => this.actorTerritoryFor(state, player) !== null);
+  }
+
+  actorTerritoryFor(state, player) {
+    const family = state.players[player];
+    return territoryKeys(state).sort().find(key => state.territories[key].family === family
+      && !isEliminated(state.territories[key])) || null;
   }
 
   getObservation(state, actor) {
-    const own = state.territories[actor];
+    const actorKey = this.actorTerritoryFor(state, actor);
+    const own = state.territories[actorKey];
     if (!own) throw new Error(`Unknown actor ${actor}`);
     const publicTerritories = {};
     territoryKeys(state).forEach(key => {
@@ -319,7 +331,7 @@ class JavaScriptGameAdapter {
         territories: publicTerritories
       },
       privateState: {
-        territory: actor,
+        territory: actorKey,
         family: own.family,
         stash: own.stash || 0,
         blackBudget: own.blackBudget || 0
@@ -330,7 +342,7 @@ class JavaScriptGameAdapter {
   }
 
   getStrategicFeatures(state, actor) {
-    const data = state.territories[actor];
+    const data = state.territories[this.actorTerritoryFor(state, actor)];
     const role = data.type;
     const objectives = this.rules.OBJECTIVES;
     const features = {
@@ -356,7 +368,9 @@ class JavaScriptGameAdapter {
     return features;
   }
 
-  listLegalActions(state, actor) {
+  listLegalActions(state, player) {
+    const actor = this.actorTerritoryFor(state, player);
+    if (actor === null) return [];
     const legal = [];
     ACTIONS.filter(action => isActionLegal(this.rules, state, actor, action)).forEach(action => {
       filterFailedStateTargets(state, action, targetKeysForAction(state, actor, action)).forEach(target => {
@@ -425,7 +439,8 @@ class JavaScriptGameAdapter {
   }
 
   getWinners(state) {
-    return territoryKeys(state).filter(key => state.territories[key].outcome === 'Won');
+    return Object.keys(state.players).filter(player => territoryKeys(state).some(key =>
+      state.territories[key].family === state.players[player] && state.territories[key].outcome === 'Won'));
   }
 
   checkInvariants(state) {
@@ -454,6 +469,7 @@ class JavaScriptGameAdapter {
       gameId: state.gameId,
       round: state.round,
       phase: state.phase,
+      players: state.players,
       crisis: state.crisis ? state.crisis.id : null,
       crisisDeck: state.crisisDeck || null,
       territories: state.territories

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Removed secret resolution and cleanup seeds from public BGA logs. Commit preimages are retained by hash so failed replacement requests and reconnects preserve the accepted action. BGA action menus now check realignment eligibility, target-specific costs, resource access, and failed-state extraction guards; playtest legality checks include own-client sanctions and living overlords. Playtest players retain family ownership across coups, with one acting territory per surviving player and ownership-aware winners and replay logs. Added regression coverage and CI that requires PHP server checks.
+
 - Fixed five review findings: Black Budget is filtered from public BGA state and sent privately to current owners; tribute and card plays refresh the board immediately; unassigned families cannot trigger game end; playtest choices use post-tribute balances; revealed actions identify their player, acting territory, target, and framing. Added executable PHP server and JavaScript client/adapter regression tests.
 
 - Failed states + first-playtest fixes (from a full 12-round, 10-seat playtest of the previous build):

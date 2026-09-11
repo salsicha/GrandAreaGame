@@ -398,7 +398,7 @@ class GrandAreaRules
      */
     public static function resolveTurn($state, $actions, $seed, $crisis = null, $narrative = array())
     {
-        $logs = array('Using replay seed: ' . $seed);
+        $logs = array();
         $newState = self::cloneTerritories($state);
         $original = self::cloneTerritories($state);
 
@@ -1646,7 +1646,7 @@ class GrandAreaRules
      */
     public static function resolveCleanup($state, $seed)
     {
-        $logs = array('Using replay seed: ' . $seed, '--- Phase 4: The Heat (Cleanup) ---');
+        $logs = array('--- Phase 4: The Heat (Cleanup) ---');
         $newState = self::cloneTerritories($state);
 
         foreach (array_keys($newState) as $key) {

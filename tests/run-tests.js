@@ -1436,6 +1436,8 @@ if (commandExists(phpCommand)) {
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /Only participating winners/);
   });
+} else if (process.env.GRANDAREA_REQUIRE_PHP === '1') {
+  throw new Error('PHP is required for this verification run; install PHP or set GRANDAREA_PHP');
 } else {
   skip('BGA server privacy notifications scoring and reveals', 'php command is not installed');
   skip('BGA PHP files pass syntax lint', 'php command is not installed');
@@ -1792,11 +1794,12 @@ test('BGA board template embeds the world map safely', () => {
   assert.doesNotMatch(tpl, /<style>/, 'inline <style> blocks break the BGA template engine');
 });
 
-function loadBgaClient(nodes = {}) {
+function loadBgaClient(nodes = {}, browser = {}) {
   let methods;
   const subscriptions = {};
   const context = {
     _: text => text,
+    window: browser,
     ebg: { core: { gamegui: {} } },
     define: (dependencies, factory) => {
       methods = factory({
@@ -2133,6 +2136,135 @@ test('crisis deck reshuffles never repeat the crisis that just resolved', () => 
     const drawn = state.crisisDeck.discard[0];
     assert.notEqual(drawn, 'guatemala1954', `seed ${i} drew the crisis that just resolved`);
   }
+});
+
+test('commit replacement retains accepted secrets across failures and reconnects', () => {
+  const { createHash } = require('node:crypto');
+  const storage = new Map();
+  const browser = { localStorage: {
+    getItem: key => storage.get(key) || null,
+    setItem: (key, value) => storage.set(key, value)
+  } };
+  const nodes = { grandarea_action_select: { value: 'Pass' } };
+  const { client, subscriptions } = loadBgaClient(nodes, browser);
+  Object.assign(client, { myFamily: 'USA', player_id: 1, table_id: 42, checkAction: () => true });
+  client.showMessage = message => assert.fail(message);
+  let nonce = 0;
+  client.randomNonce = () => `nonce${++nonce}`;
+  const hash = value => createHash('sha256').update(value).digest('hex');
+  client.sha256Hex = (value, done) => done(hash(value));
+  const calls = [];
+  client.ajaxcall = (url, args, receiver, success, error) => calls.push({ url, args, success, error });
+  client.onCommitClick();
+  const first = calls.at(-1);
+  first.success();
+  nodes.grandarea_action_select.value = 'Fortify';
+  client.onCommitClick();
+  const second = calls.at(-1);
+  second.error();
+  client.onRevealClick();
+  let reveal = calls.at(-1).args;
+  assert.equal(hash(`1|${reveal.payload}|${reveal.nonce}`), first.args.hash);
+
+  // The replacement reached the server but its response was lost. A reload's
+  // snapshot must be able to select that candidate, without losing the first.
+  const reloaded = loadBgaClient({}, browser).client;
+  Object.assign(reloaded, { player_id: 1, table_id: 42, checkAction: () => true, ajaxcall: client.ajaxcall, showMessage: client.showMessage });
+  reloaded.gamedatas.commit_hash = second.args.hash;
+  reloaded.onRevealClick();
+  reveal = calls.at(-1).args;
+  assert.equal(hash(`1|${reveal.payload}|${reveal.nonce}`), second.args.hash);
+  assert.equal(Object.keys(client.storedSecrets(1)).length, 2);
+
+  subscriptions.commitSubmitted({ player_id: 1, round: 1, commit_hash: second.args.hash });
+  assert.equal(client.gamedatas.commit_hash, second.args.hash);
+  subscriptions.commitSubmitted({ player_id: 1, round: 0, commit_hash: first.args.hash });
+  assert.equal(client.gamedatas.commit_hash, second.args.hash, 'Old-round notification changed current commitment');
+
+  storage.set(client.storageKey(1), JSON.stringify({ payload: 'legacy-payload', nonce: 'legacy-nonce' }));
+  client.onCommitClick();
+  calls.at(-1).error();
+  client.onRevealClick();
+  assert.equal(calls.at(-1).args.payload, 'legacy-payload', 'Upgrade lost an existing secret');
+});
+
+test('BGA and playtest menus reject unaffordable or ineligible targets', () => {
+  const { JavaScriptGameAdapter, ACTIONS } = require('../playtest/src/engine/jsAdapter');
+  const adapter = new JavaScriptGameAdapter();
+  const state = adapter.createInitialState({}, 'legal-menu');
+  state.crisis = null;
+  const { client } = loadBgaClient();
+  const scenarios = [
+    () => {},
+    () => { state.territories.NorthAmerica.socialCapital = 5; },
+    () => { state.territories.EasternEurope.failedState = true; state.territories.EastAsia.wealth = 7; state.territories.EastAsia.politicalCapital = 6; },
+    () => { state.territories.EastAsia.wealth = 8; },
+    () => { state.territories.NorthAmerica.outcome = 'Lost'; },
+    () => { for (const data of Object.values(state.territories)) data.resources = []; }
+  ];
+  for (const change of scenarios) {
+    change();
+    client.territories = state.territories;
+    for (const player of adapter.getPendingActors(state)) {
+      client.myFamily = state.players[player];
+      const actor = adapter.actorTerritoryFor(state, player);
+      const options = adapter.listLegalActions(state, player).filter(action => action.parameters.framing === 0);
+      const bgaOptions = ACTIONS.filter(action => client.isActionAffordable(action, state.territories[actor]))
+        .flatMap(action => Array.from(client.targetKeysFor(action), target => `${action}:${target}`)).sort();
+      assert.deepEqual(bgaOptions, options.map(action => `${action.type}:${action.target}`).sort(), `Menu drift for ${player}`);
+      for (const action of options) {
+        const result = adapter.rules.resolveTurn(state.territories, [{ family: actor, action: action.type, target: action.target }], { seed: 'menu-check' });
+        assert.ok(!result.logs.some(line => line.includes(`failed ${action.type} (`)), `${player}: ${action.type} ${action.target}: ${result.logs.join('; ')}`);
+      }
+    }
+  }
+});
+
+test('playtest seats follow family ownership and award captured-territory wins to the owner', () => {
+  const { JavaScriptGameAdapter } = require('../playtest/src/engine/jsAdapter');
+  const adapter = new JavaScriptGameAdapter();
+  const state = adapter.createInitialState({}, 'ownership');
+  const originalHash = adapter.hashState(state);
+  state.players.NorthAmerica = 'Alternate family';
+  assert.notEqual(adapter.hashState(state), originalHash, 'Replay hash omitted player assignments');
+  state.players.NorthAmerica = 'USA';
+  state.territories.LatinAmerica.family = 'USA';
+  state.territories.NorthAmerica.family = 'China';
+  assert.equal(adapter.actorTerritoryFor(state, 'NorthAmerica'), 'LatinAmerica');
+  assert.equal(adapter.getPendingActors(state).includes('LatinAmerica'), false, 'Dispossessed client retained a turn');
+  assert.equal(adapter.getObservation(state, 'NorthAmerica').privateState.territory, 'LatinAmerica');
+  assert.ok(adapter.listLegalActions(state, 'NorthAmerica').every(action => action.actor === 'LatinAmerica'));
+  assert.equal(adapter.getPendingActors(state).filter(player => state.players[player] === 'China').length, 1);
+  state.territories.NorthAmerica.outcome = 'Won';
+  assert.deepEqual(adapter.getWinners(state), ['EastAsia']);
+});
+
+test('episode runner keeps the original agent when its family moves to a surviving holding', async () => {
+  const { JavaScriptGameAdapter } = require('../playtest/src/engine/jsAdapter');
+  const { runEpisode } = require('../playtest/src/runner/episodeRunner');
+  const adapter = new JavaScriptGameAdapter();
+  const initial = adapter.createInitialState.bind(adapter);
+  adapter.createInitialState = (...args) => {
+    const state = initial(...args);
+    state.territories.LatinAmerica.family = 'USA';
+    state.territories.NorthAmerica.family = 'China';
+    return state;
+  };
+  const seen = [];
+  const agents = new Map(Object.keys(readJson('frontend', 'data', 'territories.json')).map(player => [player, {
+    id: player,
+    choose: async ({ observation, legalActions }) => {
+      seen.push({ player, territory: observation.privateState.territory });
+      return { actionId: legalActions.find(action => action.type === 'Pass').id };
+    }
+  }]));
+  const transitions = [];
+  const logger = { writeSetup() {}, writeDecision() {}, writeTransition(record) { transitions.push(record); }, writeSummary() {}, async close() {} };
+  await runEpisode(adapter, { maxRounds: 1, episodeSeed: 'captured-seat' }, agents, logger);
+  assert.ok(transitions[0].actions.some(action => action.actor === 'NorthAmerica' && action.territory === 'LatinAmerica'));
+  assert.ok(seen.some(entry => entry.player === 'NorthAmerica' && entry.territory === 'LatinAmerica'));
+  assert.ok(!seen.some(entry => entry.player === 'LatinAmerica'));
+  assert.equal(seen.filter(entry => entry.player === 'EastAsia').length, 1);
 });
 
 const cliArgs = process.argv.slice(2);

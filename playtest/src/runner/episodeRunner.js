@@ -66,7 +66,7 @@ async function runEpisode(adapter, config, agents, logger, metadata = {}) {
     logger.writeTransition({
       round: state.round,
       seed: transitionSeed,
-      actions: decisionResults.map(result => ({ actor: result.actor, actionId: result.action.id, type: result.action.type, target: result.action.target })),
+      actions: decisionResults.map(result => ({ actor: result.actor, territory: result.action.actor, actionId: result.action.id, type: result.action.type, target: result.action.target })),
       logs: saveTrace ? transition.logs : undefined,
       invariantFailures: failures,
       stateDelta: transition.stateDelta

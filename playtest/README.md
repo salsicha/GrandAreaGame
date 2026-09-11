@@ -51,3 +51,5 @@ Episode traces are written under `playtest/runs/episodes/` and are ignored by Gi
 - `src/agents/ollamaAgent.js`: local Ollama HTTP client and structured-output validation.
 - `src/runner/`: episode loop and JSONL logger.
 - `src/checks/readiness.js`: non-agent preflight checks.
+
+Seat assignments identify players by their starting territory. The adapter retains each player's original family, chooses one surviving holding per family in sorted territory order (matching BGA), and eliminates a seat when its family controls no surviving territory. Captured holdings never retain their former agent. Replay hashes include these stable player assignments; transition actions record both the player (`actor`) and the acting `territory`.

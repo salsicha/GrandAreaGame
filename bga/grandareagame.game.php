@@ -280,7 +280,9 @@ class GrandAreaGame extends Table
             . $this->sqlString($hash) . ", NOW(), 0, NULL)";
         self::DbQuery($sql);
 
-        self::notifyAllPlayers('commitSubmitted', '', array('player_id' => $playerId));
+        self::notifyAllPlayers('commitSubmitted', '', array(
+            'player_id' => $playerId, 'commit_hash' => $hash, 'round' => $round
+        ));
     }
 
     public function revealActionPayload($payload, $nonce)
@@ -687,6 +689,13 @@ class GrandAreaGame extends Table
         );
         $result['round'] = intval(self::getGameStateValue('round_number'));
         $result['round_limit'] = $this->roundLimit();
+        // Reconcile locally retained secrets with the commitment actually accepted.
+        $commit = self::getObjectFromDb(
+            "SELECT commit_hash FROM secret_submissions WHERE game_id = " . $gameId
+            . " AND round_number = " . $result['round'] . " AND player_id = " . $currentPlayerId,
+            true
+        );
+        $result['commit_hash'] = $commit ? $commit['commit_hash'] : null;
         $state = $this->loadTerritoryState();
         $result['territories'] = $this->territoryStateForFamily($state);
         $result['current_crisis'] = $this->loadRuntime('current_crisis', null);

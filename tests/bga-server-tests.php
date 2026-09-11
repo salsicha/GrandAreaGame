@@ -18,6 +18,7 @@ class Table
     public static $notifications = array();
     public static $writes = array();
     public static $commit = null;
+    public static $secretSalt = 'regression-secret-salt';
     public $gamestate;
     public $territoryMaterial;
     public $crisisMaterial;
@@ -76,6 +77,7 @@ class Table
     public static function getObjectFromDb($sql, $single = false)
     {
         if (strpos($sql, 'FROM game_runtime') !== false) {
+            if (strpos($sql, "'secret_salt'") !== false) return array('state_json' => json_encode(self::$secretSalt));
             return null;
         }
         if (strpos($sql, 'FROM secret_submissions') !== false) {
@@ -127,6 +129,7 @@ function resetGame()
     Table::$currentPlayer = 1;
     Table::$notifications = array();
     Table::$writes = array();
+    Table::$commit = null;
     return $game;
 }
 
@@ -151,6 +154,10 @@ function notification($type, $recipient = null)
 
 function expectNotificationPrivacy($type)
 {
+    foreach (Table::$notifications as $entry) {
+        expect(strpos(json_encode($entry['args']), Table::$secretSalt) === false, 'Secret salt leaked in ' . $entry['type']);
+        expect(strpos(json_encode($entry['args']), 'Using replay seed:') === false, 'Replay seed leaked in ' . $entry['type']);
+    }
     expectVisibility(notification($type)['territories'], null);
     expectVisibility(notification('privateTerritories', 1)['territories'], 'USA');
     expectVisibility(notification('privateTerritories', 2)['territories'], 'China');
@@ -226,3 +233,9 @@ expect($reveal['action']['family'] === 'NorthAmerica', 'Reveal omitted acting te
 expect($reveal['action']['framing'] === 5, 'Reveal omitted framing');
 expect($reveal['action']['target'] === 'EastAsia', 'Reveal omitted target');
 echo "[PASS] Reveals publish actor identity, target, and framing\n";
+
+$game = resetGame();
+expect($game->snapshot()['commit_hash'] === null, 'Absent commitment must be null');
+Table::$commit = array('commit_hash' => str_repeat('a', 64));
+expect($game->snapshot()['commit_hash'] === str_repeat('a', 64), 'Reconnect omitted accepted commitment hash');
+echo "[PASS] Reconnect snapshots identify the accepted commitment without exposing its preimage\n";

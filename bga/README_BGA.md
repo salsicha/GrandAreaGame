@@ -64,7 +64,7 @@ A repo test verifies the embedded material checksum matches the JSON sources, so
 
 ## Client
 
-The Dojo client (`grandareagame.js` + `grandareagame_grandareagame.tpl` + `grandareagame.css`) renders the world-map board with role/status overlays and click-to-select, a territory inspector, an action builder (action/target/framing filtered to server-acceptable choices), the commit/reveal flow (SHA-256 via `crypto.subtle`, nonce + payload stored in `localStorage` per table/round), the player's hand with play buttons, and a running game log. A player who loses their stored secret (different browser/device) can always End Turn instead of revealing.
+The Dojo client (`grandareagame.js` + `grandareagame_grandareagame.tpl` + `grandareagame.css`) renders the world-map board with role/status overlays and click-to-select, a territory inspector, an action builder (action/target/framing filtered to server-acceptable choices), the commit/reveal flow (SHA-256 via `crypto.subtle`, nonce + payload retained by commitment hash in `localStorage` per table/player/round, reconciled with the accepted server hash on reconnect), the player's hand with play buttons, and a running game log. A player who loses their stored secret (different browser/device) can always End Turn instead of revealing.
 
 ## Remaining BGA Work
 

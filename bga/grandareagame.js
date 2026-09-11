@@ -343,14 +343,31 @@ define([
       return parseInt(data && data[field], 10) || 0;
     },
 
+    availableResources: function(me) {
+      var resources = (me.resources || []).slice();
+      var compliant = me.type === 'Client' && me.clientOf && this.num(me, 'defiance') === 0;
+      var keys = Object.keys(this.territories);
+      for (var i = 0; i < keys.length; i++) {
+        var other = this.territories[keys[i]];
+        if (this.isEliminated(other)) continue;
+        var ownClient = other.type === 'Client' && other.clientOf === me.family && this.num(other, 'defiance') === 0;
+        var blocMate = other.type === 'Client' && other.clientOf === me.clientOf && this.num(other, 'defiance') === 0;
+        if (ownClient || (compliant && (other.family === me.clientOf || blocMate))) {
+          resources = resources.concat(other.resources || []);
+        }
+      }
+      return resources;
+    },
+
     isActionAffordable: function(action, me) {
+      if (this.isEliminated(me)) return action === 'Pass';
       if (action === 'Coup') return this.num(me, 'blackBudget') >= 10;
       if (action === 'FalseFlag') return this.num(me, 'blackBudget') >= 8;
       if (action === 'CovertInfluence') return this.num(me, 'blackBudget') >= 6;
       if (action === 'CounterIntel') return this.num(me, 'blackBudget') >= 4;
       if (action === 'Fortify') return this.num(me, 'wealth') >= 6;
       if (action === 'Invade') return this.num(me, 'armies') >= 1 && this.num(me, 'wealth') >= 12;
-      if (action === 'Develop') return this.num(me, 'wealth') >= 10;
+      if (action === 'Develop') return this.num(me, 'wealth') >= 10 && this.availableResources(me).some(function(r) { return r === 'Industry' || r === 'Technology'; });
       if (action === 'RegionalRivalry') return me.type === 'Regional' && this.num(me, 'politicalCapital') >= 6;
       if (action === 'Propaganda') return this.num(me, 'stash') >= 8;
       if (action === 'Sanction') return this.num(me, 'politicalCapital') >= 5;
@@ -367,10 +384,16 @@ define([
       if (action === 'MakeExample') return this.num(me, 'socialCapital') >= 10;
       if (action === 'Concession') return this.num(me, 'wealth') >= 10 && this.num(me, 'politicalCapital') >= 5;
       if (action === 'Educate') return this.num(me, 'wealth') >= 8;
-      if (action === 'Mobilize') return this.num(me, 'wealth') >= 10;
+      if (action === 'Mobilize') return this.num(me, 'wealth') >= 10 && this.availableResources(me).indexOf('Oil') !== -1;
       if (action === 'Launder') return this.num(me, 'stash') >= 6;
       if (action === 'Crackdown') return this.num(me, 'politicalCapital') >= 6;
-      if (action === 'GeneralStrike') return me.type === 'Client' && this.num(me, 'wealth') >= 5;
+      if (action === 'GeneralStrike') {
+        var self = this;
+        return me.type === 'Client' && this.num(me, 'wealth') >= 5 && Object.keys(this.territories).some(function(key) {
+          var other = self.territories[key];
+          return other.family === me.clientOf && !self.isEliminated(other);
+        });
+      }
       if (action === 'Solidarity') return me.type === 'Client' && this.num(me, 'wealth') >= 6;
       return true;
     },
@@ -411,6 +434,16 @@ define([
         }
         if (mode === 'otherClient' && data.type !== 'Client') {
           continue;
+        }
+        if (action === 'Sanction' && data.type === 'Client' && data.clientOf === myFamily && this.num(me, 'socialCapital') < 12) continue;
+        if (['Skim', 'DebtShakedown', 'EconomicExploitation'].indexOf(action) !== -1 && data.failedState) continue;
+        if (mode === 'rivalClient') {
+          if (data.failedState) {
+            if (this.num(me, 'politicalCapital') < 6 || this.num(me, 'wealth') < 8) continue;
+          } else {
+            if (this.num(me, 'politicalCapital') < 12) continue;
+            if (this.num(data, 'defiance') === 0 && this.num(data, 'independenceSentiment') < 50 && this.num(data, 'realignmentPressure') < 8) continue;
+          }
         }
         out.push(key);
       }
@@ -494,6 +527,14 @@ define([
       return 'grandarea_' + table + '_p' + this.player_id + '_r' + round;
     },
 
+    storedSecrets: function(round) {
+      var stored = window.localStorage.getItem(this.storageKey(round));
+      var record = stored ? JSON.parse(stored) : {};
+      // Preserve secrets written by clients before hash-indexed storage.
+      if (record.payload && record.nonce) return { legacy: record };
+      return record.secrets || {};
+    },
+
     refreshCommitStatus: function() {
       var node = dojo.byId('grandarea_commit_status');
       if (!node) {
@@ -560,7 +601,9 @@ define([
       var self = this;
       this.sha256Hex(this.player_id + '|' + payloadStr + '|' + nonce, function(hash) {
         try {
-          window.localStorage.setItem(self.storageKey(round), JSON.stringify({ payload: payloadStr, nonce: nonce }));
+          var secrets = self.storedSecrets(round);
+          secrets[hash] = { payload: payloadStr, nonce: nonce };
+          window.localStorage.setItem(self.storageKey(round), JSON.stringify({ secrets: secrets }));
         } catch (e) {
           self.showMessage(_('Could not store the secret locally; you will not be able to reveal it.'), 'error');
           return;
@@ -569,6 +612,7 @@ define([
           lock: true,
           hash: hash
         }, self, function() {
+          if (self.currentRound === round) self.gamedatas.commit_hash = hash;
           self.refreshCommitStatus();
         }, function() {});
       }, function() {
@@ -583,20 +627,15 @@ define([
       if (!this.checkAction('reveal', true)) {
         return;
       }
-      var stored = null;
-      try {
-        stored = window.localStorage.getItem(this.storageKey(this.currentRound));
-      } catch (e) {
-        stored = null;
-      }
       var record = null;
       try {
-        record = stored ? JSON.parse(stored) : null;
+        var secrets = this.storedSecrets(this.currentRound);
+        record = secrets[this.gamedatas.commit_hash] || secrets.legacy || null;
       } catch (e) {
         record = null;
       }
       if (!record || !record.payload || !record.nonce) {
-        this.showMessage(_('No stored secret found in this browser for this round — use End turn instead.'), 'error');
+        this.showMessage(_('No matching secret found. Refresh to sync the accepted commitment, or use End turn.'), 'error');
         return;
       }
       this.ajaxcall('/grandareagame/grandareagame/reveal.html', {
@@ -778,6 +817,11 @@ define([
     },
 
     notif_commitSubmitted: function(notif) {
+      if (String(notif.args.player_id) === String(this.player_id)
+          && Number(notif.args.round) === this.currentRound) {
+        this.gamedatas.commit_hash = notif.args.commit_hash;
+        this.refreshCommitStatus();
+      }
       this.logLine('A player locked in a secret action.');
     },
 
@@ -823,6 +867,7 @@ define([
 
     notif_roundAdvanced: function(notif) {
       this.currentRound = parseInt(notif.args.round, 10) || (this.currentRound + 1);
+      this.gamedatas.commit_hash = null;
       this.renderRound();
       this.refreshCommitStatus();
       this.logLine('Round ' + this.currentRound + ' begins.');
